@@ -23,7 +23,7 @@ design choices.
  FOR NON-TECHNICAL USERS (packaged installer)
 --------------------------------------------------------------------
 
-No Python, no terminal. See GETTING_STARTED.md. Either double-click
+No Python, no terminal. See GETTING_STARTED.txt. Either double-click
 LedgerOCR-Setup.exe, or, with the fallback folder, double-click
 INSTALL.bat. It sets everything up (bundled runtime, shortcuts,
 optional error-check model) and opens the app.

@@ -36,7 +36,7 @@ Source: "dist\LedgerOCR\*"; DestDir: "{app}"; Flags: recursesubdirs createallsub
 ; helper + docs
 Source: "install_ollama.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "uninstall_cleanup.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\GETTING_STARTED.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
+Source: "..\GETTING_STARTED.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"
@@ -46,7 +46,7 @@ Name: "errorchecker"; Description: "Also set up the optional smart error-checker
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
-Name: "{group}\Getting Started"; Filename: "{app}\GETTING_STARTED.md"
+Name: "{group}\Getting Started"; Filename: "{app}\GETTING_STARTED.txt"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
