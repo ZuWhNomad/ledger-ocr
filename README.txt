@@ -5,7 +5,7 @@
 Local, privacy-first document-to-data for accountants. Drag in a bank
 statement / general-ledger PDF (or a scan/image) and get back a clean
 CSV / XLSX. Everything runs on your machine — no cloud OCR, no cloud
-LLM. See PLAN.md for the architecture and the research behind the
+LLM. See docs/PLAN.md for the architecture and the research behind the
 design choices.
 
   * Deterministic first. Born-digital PDFs are parsed by exact
@@ -42,7 +42,8 @@ and Inno Setup 6):
 
 Requires Python 3.12+ (Node not needed).
 
-    pip install -r requirements.txt -c constraints.txt
+    pip install -r app
+equirements.txt -c app\constraints.txt
 
 constraints.txt pins the exact tested versions (including transitive
 deps) for a reproducible install; drop the "-c" flag only if you
@@ -80,7 +81,7 @@ Ollama is down or slow, the pipeline simply skips this step.
 --------------------------------------------------------------------
 
     powershell -ExecutionPolicy Bypass -File run.ps1
-    (or:  python server.py --port 8765 --open )
+    (or:  python app\server.py --port 8765 --open )
 
 Then open http://127.0.0.1:8765 , drag a PDF/image onto the drop zone,
 and download the CSV or XLSX. Flagged rows are highlighted. Runs on
@@ -121,21 +122,23 @@ the cause (advisory only).
  TEST & SAMPLE
 --------------------------------------------------------------------
 
-    python samples/make_sample.py   # (re)generate the synthetic sample PDF
-    python tests/test_pipeline.py   # run tests + the A/B extraction comparison
+    python app\samples\make_sample.py   # (re)generate the synthetic sample PDF
+    python app	ests	est_pipeline.py   # run tests + the A/B extraction comparison
 
-samples/bank_statement.pdf is a synthetic statement with one
-deliberately corrupted running balance; samples/out/ holds the
-exported CSV/XLSX. The suite also runs the A/B test (see PLAN.md).
+app\samplesank_statement.pdf is a synthetic statement with one
+deliberately corrupted running balance; app\samples\out\ holds the
+exported CSV/XLSX. The suite also runs the A/B test (see docs/PLAN.md).
 
 
 --------------------------------------------------------------------
  PROJECT LAYOUT
 --------------------------------------------------------------------
 
-    ocr_pipeline/      extract.py  tables.py  reconcile.py
+    app/ocr_pipeline/  extract.py  tables.py  reconcile.py
                        validate.py  export.py  pipeline.py
-    server.py          tiny stdlib HTTP server for the drop-and-drop app
-    static/index.html  the drag-and-drop UI (vanilla JS)
-    samples/           synthetic sample generator, sample PDF, outputs
-    tests/             end-to-end tests + the A/B comparison
+    app/server.py      tiny stdlib HTTP server for the drop-and-drop app
+    app/static/index.html  the drag-and-drop UI (vanilla JS)
+    app/samples/       synthetic sample generator, sample PDF, outputs
+    app/tests/         end-to-end tests + the A/B comparison
+    installer/         PyInstaller spec + Inno Setup script + build scripts
+    docs/              PLAN.md, SIGNING.txt, REVIEWs, FIXES_BACKLOG.md

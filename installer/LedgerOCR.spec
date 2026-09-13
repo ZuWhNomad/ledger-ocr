@@ -1,7 +1,12 @@
-# PyInstaller spec for LedgerOCR (one-folder). Build:  python -m PyInstaller LedgerOCR.spec
+# PyInstaller spec for LedgerOCR (one-folder). Build:  python -m PyInstaller installer\LedgerOCR.spec
+import os
 from PyInstaller.utils.hooks import collect_all
 
-datas = [("static", "static")]
+# This spec lives in installer/; the app source lives in ../app. Resolve paths from the
+# spec's own location (SPECPATH) so the build works regardless of the current directory.
+APP = os.path.join(os.path.dirname(SPECPATH), "app")
+
+datas = [(os.path.join(APP, "static"), "static")]
 binaries = []
 hiddenimports = ["ocr_pipeline"]
 
@@ -17,8 +22,8 @@ for pkg in ("pdfplumber", "pypdfium2", "pypdfium2_raw", "pdfminer", "openpyxl", 
         pass
 
 a = Analysis(
-    ["run_app.py"],
-    pathex=["."],
+    [os.path.join(APP, "run_app.py")],
+    pathex=[APP],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,

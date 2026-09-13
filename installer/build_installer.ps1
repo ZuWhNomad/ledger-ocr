@@ -21,7 +21,7 @@
     Optional: $env:CODESIGN_TS = timestamp URL (default http://timestamp.digicert.com).
     When set, both the frozen exe and the Setup.exe are signed with an RFC3161
     timestamp (/tr), SHA-256 file digest (/fd) and SHA-256 timestamp digest (/td).
-    When unset, the build proceeds UNSIGNED and prints a note. See SIGNING.txt.
+    When unset, the build proceeds UNSIGNED and prints a note. See docs/SIGNING.txt.
 #>
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
@@ -65,7 +65,7 @@ if ($env:CODESIGN_THUMBPRINT -or ($env:CODESIGN_PFX -and $env:CODESIGN_PASS)) {
   }
 } else {
   Write-Host "No code-signing cert configured (set CODESIGN_THUMBPRINT or CODESIGN_PFX + CODESIGN_PASS)." -ForegroundColor Yellow
-  Write-Host "Building UNSIGNED -- users will see a SmartScreen prompt. See SIGNING.txt and GETTING_STARTED.txt." -ForegroundColor Yellow
+  Write-Host "Building UNSIGNED -- users will see a SmartScreen prompt. See docs/SIGNING.txt and GETTING_STARTED.txt." -ForegroundColor Yellow
 }
 
 function Sign-File([string]$path) {
@@ -77,7 +77,7 @@ function Sign-File([string]$path) {
 
 # 1) freeze
 Write-Host "== Freezing app with PyInstaller ==" -ForegroundColor Cyan
-& $py -m PyInstaller --noconfirm --distpath installer\dist --workpath installer\build LedgerOCR.spec
+& $py -m PyInstaller --noconfirm --distpath installer\dist --workpath installer\build installer\LedgerOCR.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
 # 2) sign the frozen exe (before it is packed into the installer)
