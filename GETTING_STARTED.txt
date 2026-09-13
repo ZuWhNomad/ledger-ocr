@@ -118,16 +118,17 @@ That's it.
  READING SCANS AND PHOTOS
 --------------------------------------------------------------------
 
-The base app reads born-digital PDFs — statements you download or
-export from your bank or accounting software. Those need nothing extra.
+Scans and photos work out of the box. The installer sets up a small,
+free, offline text-recognition engine (Tesseract) as part of the
+install — it runs entirely on your machine, like everything else. Just
+drag a scanned or photographed statement onto the drop zone.
 
-To read scanned or photographed paper statements, LedgerOCR needs a
-small, free add-on called Tesseract (an offline text-recognition
-engine — it also runs entirely on your machine). Until it is
-installed, the app shows only PDF as the accepted type and will tell
-you if a dropped file needs it.
+(Born-digital PDFs — the ones you download or export from your bank or
+accounting software — don't use the engine at all.)
 
-To install the add-on (one time):
+If the OCR engine didn't get installed (for example, the computer had
+no internet during setup), the app shows only PDF as the accepted type
+and the "OCR" badge won't say "ready". To add it yourself, one time:
 
   1. Open the Start menu, type "Command Prompt", and open it.
 

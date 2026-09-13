@@ -34,6 +34,7 @@ SignTool=ledgerocrsign
 ; the frozen one-folder app (built by PyInstaller into dist\LedgerOCR)
 Source: "dist\LedgerOCR\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; helper + docs
+Source: "install_tesseract.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "install_ollama.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "uninstall_cleanup.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\GETTING_STARTED.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
@@ -51,6 +52,10 @@ Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
+; BASE: install the Tesseract OCR engine so scans/photos work out of the box. Runs in its own
+; window and does NOT block the wizard; born-digital PDFs already work without waiting for it.
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\install_tesseract.ps1"""; \
+  Flags: shellexec nowait; StatusMsg: "Installing the OCR engine so scans and photos work (about 50 MB)..."
 ; optional error-checker setup -- runs in its own window and does NOT block the wizard
 ; (PKG-P2-6). The app is already fully installed by this point.
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\install_ollama.ps1"""; \
