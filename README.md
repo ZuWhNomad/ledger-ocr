@@ -82,7 +82,7 @@ print(result["summary"])          # rows, mismatches, sign convention, route
 
 - `strategy`: `"words"` (default, header-anchored coordinates) or `"lines"` (ruled/text tables).
 - `use_llm`: run the optional Ollama error-check on flagged rows.
-- `llm_model`: Ollama model name (default `qwen3.8:latest`).
+- `llm_model`: Ollama model name (default `qwen2.5:3b`, override with `OCR_LLM_MODEL`).
 
 ## Output columns
 

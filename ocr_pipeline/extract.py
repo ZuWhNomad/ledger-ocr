@@ -1,11 +1,12 @@
 """PDF/image routing and text extraction.
 
 Deterministic-first:
-  * born-digital PDF  -> pdfplumber word extraction (default) or PyMuPDF fallback
+  * born-digital PDF  -> pdfplumber word extraction ('words') or ruled-table detection
   * scanned PDF/image -> local Tesseract OCR (only when there is no text layer)
 
-Scan detection: if the average extractable text per page is below a threshold,
-the PDF is treated as scanned and routed to OCR.
+Scan detection is per page (see looks_scanned): a PDF is treated as scanned only when NO
+page carries a real text layer (the per-page MAX char count is below a threshold), so a
+hybrid document with even one born-digital page still routes to deterministic extraction.
 """
 from __future__ import annotations
 import os
@@ -48,12 +49,19 @@ def extract_tables_born_digital(path: str, strategy: str = "words") -> List[Dict
     strategy: 'words' (header-anchored coords) or 'lines' (ruled/text tables).
     """
     from . import tables as T
-    fn = T.extract_words_table if strategy == "words" else T.extract_lines_table
     import pdfplumber
     rows: List[Dict[str, str]] = []
     with pdfplumber.open(path) as pdf:
-        for page in pdf.pages:
-            rows.extend(fn(page))
+        if strategy == "words":
+            # Carry the header's column boundaries across pages so a continuation page that
+            # doesn't repeat the header still yields rows instead of silently dropping them.
+            carry = None
+            for page in pdf.pages:
+                page_rows, carry = T.extract_words_table(page, carry)
+                rows.extend(page_rows)
+        else:
+            for page in pdf.pages:
+                rows.extend(T.extract_lines_table(page))
     return rows
 
 

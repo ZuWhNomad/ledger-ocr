@@ -53,6 +53,10 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
             use_llm: bool = False, llm_model: str = VAL.DEFAULT_MODEL,
             basename: Optional[str] = None) -> Dict:
     """Run the full pipeline on one file. Returns a result dict with rows, summary, outputs."""
+    if strategy not in ("words", "lines"):
+        # Reject rather than silently falling through to 'lines' while the summary echoes
+        # the user's (possibly typo'd) string as if it had been honored.
+        return {"ok": False, "error": f"unknown strategy '{strategy}' (expected 'words' or 'lines')"}
     path = os.path.abspath(path)
     scanned = EX.looks_scanned(path)
     route = "ocr" if scanned else "born-digital"

@@ -1,5 +1,8 @@
 __pycache__/
 *.pyc
+
+# regression fixtures are regenerated deterministically by the test suite
+samples/fixture_*.pdf
 .venv/
 venv/
 *.egg-info/

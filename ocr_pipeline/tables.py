@@ -10,13 +10,14 @@ Two strategies (A/B tested in tests/):
 Both return List[List[str]] (rows of cells) so downstream code is strategy-agnostic.
 """
 from __future__ import annotations
+import re
 from typing import List, Dict, Optional
 
-# Header synonyms -> canonical column name. Lowercased substring match.
+# Header synonyms -> canonical column name. Matched on whole words (see _canon).
 HEADER_SYNONYMS: Dict[str, List[str]] = {
     "date": ["date", "posting", "trans date", "value date"],
-    "description": ["description", "details", "memo", "particulars", "narrative",
-                    "transaction", "reference", "payee"],
+    "description": ["description", "desc", "descr", "details", "memo", "particulars",
+                    "narrative", "transaction", "reference", "payee"],
     "debit": ["debit", "withdrawal", "withdrawals", "payment", "payments", "money out", "dr", "charge"],
     "credit": ["credit", "deposit", "deposits", "money in", "cr", "receipt"],
     "balance": ["balance"],
@@ -25,12 +26,23 @@ HEADER_SYNONYMS: Dict[str, List[str]] = {
 
 
 def _canon(label: str) -> Optional[str]:
-    t = label.strip().lower()
-    if not t:
+    """Map a header label to a canonical column, matching synonyms on WHOLE words only.
+
+    Whole-word matching (not substring) is essential: a substring match makes the 2-letter
+    'cr'/'dr' synonyms fire inside unrelated words -- e.g. 'Descr' contains 'cr' and would
+    mislabel a description column as credit, corrupting every row's sign.
+    """
+    words = re.findall(r"[a-z0-9]+", label.strip().lower())
+    if not words:
         return None
+    wordset = set(words)
     for canon, syns in HEADER_SYNONYMS.items():
         for s in syns:
-            if s == t or s in t:
+            parts = s.split()
+            if len(parts) == 1:
+                if parts[0] in wordset:
+                    return canon
+            elif all(p in wordset for p in parts):
                 return canon
     return None
 
@@ -87,21 +99,54 @@ def _column_bounds(header_map: Dict[str, tuple], page_width: float):
     return bounds
 
 
-def extract_words_table(page) -> List[Dict[str, str]]:
-    """Strategy 'words': return canonical dict rows using header-anchored clustering.
+_MONEY_COLS = ("debit", "credit", "amount", "balance")
+
+
+def _degroup_money_cell(cell_words: List[dict], gap_tol: float):
+    """Money columns are right-aligned, so the real number is the rightmost cluster of
+    words with only normal (space-sized) gaps between them. Any word separated from that
+    cluster by a large gap is leaked description text that drifted across the (approximate)
+    column boundary. Return (money_words, leaked_words) split at the first large gap
+    walking right-to-left. A single space-grouped number ("1 234,56") stays intact
+    because its inner gaps are small; a leaked token ("... 1043   100.00") splits off.
+    """
+    ws = sorted(cell_words, key=lambda w: w["x0"])
+    if len(ws) <= 1:
+        return ws, []
+    split = 0  # index where the rightmost small-gap cluster starts
+    for i in range(len(ws) - 1, 0, -1):
+        if ws[i]["x0"] - ws[i - 1]["x1"] > gap_tol:
+            split = i
+            break
+    return ws[split:], ws[:split]
+
+
+def extract_words_table(page, carry_bounds=None):
+    """Strategy 'words': return (rows, bounds) using header-anchored clustering.
 
     Handles multi-line descriptions: a wrapped line (text only in the description
     column, no date/amounts) is appended to the previous row's description.
+
+    Multi-page carry-over: `carry_bounds` are the column boundaries found on an earlier
+    page. A continuation page often does NOT repeat the header; when none is found here we
+    reuse the carried boundaries and treat every clustered row as data, instead of
+    silently dropping the whole page (its rows would vanish from the financial record).
+    Returns the boundaries used so the caller can carry them to the next page.
     """
     words = page.extract_words(use_text_flow=False, keep_blank_chars=False,
                                extra_attrs=["size"])
     if not words:
-        return []
+        return [], carry_bounds
     rows = _cluster_rows(words)
     hdr_i, hdr_map = _find_header(rows)
     if hdr_i < 0:
-        return []
-    bounds = _column_bounds(hdr_map, page.width)
+        if carry_bounds is None:
+            return [], None
+        bounds = carry_bounds        # continuation page: reuse the prior header's columns
+        data_rows = rows             # no header row to skip
+    else:
+        bounds = _column_bounds(hdr_map, page.width)
+        data_rows = rows[hdr_i + 1:]
 
     def assign(w) -> Optional[str]:
         mid = (w["x0"] + w["x1"]) / 2
@@ -111,13 +156,28 @@ def extract_words_table(page) -> List[Dict[str, str]]:
         return None
 
     out: List[Dict[str, str]] = []
-    for row in rows[hdr_i + 1:]:
-        cells: Dict[str, List[str]] = {}
+    for row in data_rows:
+        cells: Dict[str, List[dict]] = {}
         for w in row:
             canon = assign(w)
             if canon:
-                cells.setdefault(canon, []).append(w["text"])
-        rec = {canon: " ".join(v).strip() for canon, v in cells.items()}
+                cells.setdefault(canon, []).append(w)
+        # gap tolerance from the row's own type size: a real inter-word space is ~1 char
+        # wide; a column gap is many times that. 3x median char width sits safely between.
+        cw = sorted((w["x1"] - w["x0"]) / max(1, len(w["text"])) for w in row)
+        gap_tol = 3.0 * (cw[len(cw) // 2] if cw else 3.0)
+        # A wide description column can push text across the approximate boundary into a
+        # right-aligned money column; pull those leaked tokens back into the description.
+        for mc in _MONEY_COLS:
+            if mc in cells and len(cells[mc]) > 1:
+                money_ws, leaked = _degroup_money_cell(cells[mc], gap_tol)
+                if leaked:
+                    cells[mc] = money_ws
+                    cells.setdefault("description", [])
+                    cells["description"].extend(leaked)
+        for canon in cells:
+            cells[canon].sort(key=lambda w: w["x0"])
+        rec = {canon: " ".join(w["text"] for w in v).strip() for canon, v in cells.items()}
         if not rec:
             continue
         has_date = bool(rec.get("date"))
@@ -127,7 +187,7 @@ def extract_words_table(page) -> List[Dict[str, str]]:
             out[-1]["description"] = (out[-1].get("description", "") + " " + rec["description"]).strip()
             continue
         out.append(rec)
-    return out
+    return out, bounds
 
 
 def extract_lines_table(page) -> List[Dict[str, str]]:

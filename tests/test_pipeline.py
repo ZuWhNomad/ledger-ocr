@@ -25,6 +25,15 @@ def _ensure_sample():
         make_sample.make_pdf(SAMPLE)
 
 
+def _make_fixture(builder, name):
+    """Build (once) a fixture PDF under samples/ using the named make_sample builder."""
+    sys.path.insert(0, os.path.join(ROOT, "samples"))
+    import make_sample
+    path = os.path.join(ROOT, "samples", name)
+    getattr(make_sample, builder)(path)  # deterministic; cheap to regenerate
+    return path
+
+
 def test_words_strategy_extracts_and_flags():
     _ensure_sample()
     r = process(SAMPLE, strategy="words")
@@ -83,6 +92,96 @@ def test_sign_autodetect_ledger_debit_raises():
     rows, summary = RC.reconcile(rows)
     assert summary["sign_convention"] == "debit_raises_balance", summary
     assert summary["balance_mismatches"] == 0
+
+
+def test_parse_money_locale_thousands():
+    """COR-P1-1: US thousands, EU thousands, whole-dollar and millions parse exactly.
+
+    Regression for the old 'locale = whichever separator is last' guess, which turned
+    '5,000' into 5.00 and dropped '1.000.000' entirely.
+    """
+    p = RC.parse_money
+    # US thousands, whole dollars (no decimals) -- the core silent bug
+    assert p("5,000") == Decimal("5000")
+    assert p("1,500") == Decimal("1500")
+    assert p("12,345") == Decimal("12345")
+    assert p("1,234,567") == Decimal("1234567")
+    # US thousands with cents
+    assert p("1,234.56") == Decimal("1234.56")
+    assert p("12,345.67") == Decimal("12345.67")
+    # EU thousands (dot groups), with and without decimals
+    assert p("1.234") == Decimal("1234")
+    assert p("1.000.000") == Decimal("1000000")
+    assert p("1.234,56") == Decimal("1234.56")
+    assert p("1 234,56") == Decimal("1234.56")      # EU space thousands
+    assert p("1 000 000") == Decimal("1000000")
+    # whole-dollar plain integer and a plain cents value
+    assert p("5000") == Decimal("5000")
+    assert p("100.00") == Decimal("100.00")
+    # a money cell that is really two tokens (leaked description) must be REJECTED,
+    # never glued into one giant number
+    assert p("1043 100.00") is None
+    assert p("1,234.56 (2)") is None
+
+
+def test_single_amount_column_reconciles():
+    """COR-P1-2 / P2-1: a single signed-amount column must be reconciled, not declared
+    'unknown'. A running-balance typo has to be flagged (was silently passing)."""
+    raw = [
+        {"date": "2026-02-01", "description": "open", "amount": "0.00", "balance": "1000.00"},
+        {"date": "2026-02-02", "description": "dep", "amount": "200.00", "balance": "1200.00"},
+        {"date": "2026-02-03", "description": "wire", "amount": "-350.00", "balance": "999.00"},  # should be 850
+        {"date": "2026-02-04", "description": "refund", "amount": "50.00", "balance": "900.00"},
+    ]
+    rows = RC.normalize_rows(raw)
+    rows, summary = RC.reconcile(rows)
+    assert summary["sign_convention"] == "single_amount_column", summary
+    assert summary["balance_checked"] is True, summary
+    assert summary["balance_mismatches"] == 1, summary
+    flagged = [r for r in rows if r.get("flag")]
+    assert len(flagged) == 1 and flagged[0]["date"] == "2026-02-03", flagged
+
+
+def test_no_balance_reports_not_checked():
+    """COR-P2-8: a statement with no balance column must report 'not checked', not a
+    misleading '0 mismatches'."""
+    raw = [{"date": "2026-02-01", "description": "a", "amount": "10.00"},
+           {"date": "2026-02-02", "description": "b", "amount": "-30.00"}]
+    rows, summary = RC.reconcile(RC.normalize_rows(raw))
+    assert summary["balance_checked"] is False, summary
+    assert summary["balance_mismatches"] is None, summary
+
+
+def test_single_amount_pdf_end_to_end():
+    """Same as above but through the full extract->reconcile pipeline from a PDF fixture."""
+    path = _make_fixture("make_single_amount_pdf", "fixture_single_amount.pdf")
+    r = process(path, strategy="words")
+    assert r["ok"], r
+    assert r["summary"]["sign_convention"] == "single_amount_column", r["summary"]
+    assert r["summary"]["balance_mismatches"] == 1, r["summary"]
+    flagged = [row for row in r["rows"] if row.get("flag")]
+    assert len(flagged) == 1 and flagged[0]["date"] == "2026-02-03", flagged
+
+
+def test_two_page_no_header_keeps_all_rows():
+    """COR-P2-5: a continuation page whose header does not repeat must still yield its rows
+    (they used to vanish silently)."""
+    path = _make_fixture("make_two_page_pdf", "fixture_two_page.pdf")
+    r = process(path, strategy="words")
+    assert r["ok"], r
+    dates = [row.get("date") for row in r["rows"]]
+    assert dates == ["2026-01-02", "2026-01-03", "2026-01-04", "2026-01-05"], dates
+    assert r["summary"]["balance_mismatches"] == 0, r["summary"]  # all four reconcile
+
+
+def test_description_does_not_bleed_into_amount():
+    """COR-P1-3: a wide description must not leak a token into the right-aligned amount
+    column and concatenate into a giant fake number. Real amount is 100.00."""
+    path = _make_fixture("make_bleed_pdf", "fixture_bleed.pdf")
+    rows = process(path, strategy="words")["rows"]
+    check = [r for r in rows if r.get("date") == "2026-01-03"][0]
+    assert check["_amount"] == Decimal("100.00"), check
+    assert "CHECK" in (check.get("description") or "")  # leaked tokens landed back in description
 
 
 def test_ocr_textline_parser():
