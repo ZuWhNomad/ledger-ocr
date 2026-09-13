@@ -25,6 +25,7 @@ echo   %DEST%
 echo.
 if not exist "%DEST%" mkdir "%DEST%"
 robocopy "%SRC%" "%DEST%" /E /NFL /NDL /NJH /NJS /NP >nul
+if exist "%~dp0install_tesseract.ps1" copy /y "%~dp0install_tesseract.ps1" "%DEST%\" >nul
 if exist "%~dp0install_ollama.ps1" copy /y "%~dp0install_ollama.ps1" "%DEST%\" >nul
 if exist "%~dp0uninstall_cleanup.ps1" copy /y "%~dp0uninstall_cleanup.ps1" "%DEST%\" >nul
 if exist "%~dp0UNINSTALL.bat" copy /y "%~dp0UNINSTALL.bat" "%DEST%\" >nul
@@ -47,7 +48,12 @@ reg add "%REGKEY%" /v NoModify /t REG_DWORD /d 1 /f >nul
 reg add "%REGKEY%" /v NoRepair /t REG_DWORD /d 1 /f >nul
 
 echo.
-echo LedgerOCR works right now without any extra download.
+echo Installing the OCR engine so scans and photos work (about 50 MB)...
+powershell -ExecutionPolicy Bypass -NoProfile -File "%DEST%\install_tesseract.ps1"
+
+echo.
+echo LedgerOCR works right now. Born-digital PDFs need nothing more; the OCR engine
+echo above lets it also read scans and photos.
 echo The "smart error-checker" is optional: it downloads a helper (Ollama) and a
 echo model (~2 GB) so the app can flag suspicious rows for you.
 echo.
