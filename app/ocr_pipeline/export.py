@@ -72,3 +72,47 @@ def to_xlsx(rows: List[Dict], path: str) -> str:
         ws.column_dimensions[get_column_letter(i)].width = min(max(width + 2, 8), 60)
     wb.save(path)
     return path
+
+
+def _shade_cell(cell, fill="F4CCCC"):
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    tcPr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:fill"), fill)
+    tcPr.append(shd)
+
+
+def to_docx(rows: List[Dict], path: str) -> str:
+    from docx import Document
+    from docx.shared import RGBColor
+
+    doc = Document()
+    doc.add_heading("Transactions", level=1)
+
+    flat = _flat(rows)
+    table = doc.add_table(rows=1 + len(flat), cols=len(COLUMNS))
+    table.style = "Table Grid"
+
+    hdr_cells = table.rows[0].cells
+    for i, col in enumerate(COLUMNS):
+        hdr_cells[i].text = col
+        for p in hdr_cells[i].paragraphs:
+            for run in p.runs:
+                run.font.bold = True
+
+    for row_idx, frec in enumerate(flat, start=1):
+        row_cells = table.rows[row_idx].cells
+        is_flagged = bool(frec.get("flag"))
+        for col_idx, col in enumerate(COLUMNS):
+            cell = row_cells[col_idx]
+            cell.text = str(frec.get(col, ""))
+            if is_flagged:
+                _shade_cell(cell, fill="F4CCCC")
+                if col == "flag":
+                    for p in cell.paragraphs:
+                        for run in p.runs:
+                            run.font.color.rgb = RGBColor(255, 0, 0)
+    doc.save(path)
+    return path

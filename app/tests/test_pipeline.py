@@ -220,6 +220,79 @@ def test_ocr_words_path_recovers_columns():
     assert r["summary"]["balance_mismatches"], r["summary"]
 
 
+def test_xlsx_input_end_to_end():
+    import tempfile
+    import openpyxl
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "test_ledger.xlsx")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["Date", "Description", "Debit", "Credit", "Balance"])
+        ws.append(["2026-01-01", "Opening Balance", None, None, 1000.00])
+        ws.append(["2026-01-02", "Deposit", None, 500.00, 1500.00])
+        ws.append(["2026-01-03", "Deposit", None, 500.00, 2000.00])
+        ws.append(["2026-01-04", "Withdrawal", 200.00, None, 1200.00])
+        wb.save(path)
+        wb.close()
+
+        r = process(path)
+        assert r["ok"], r
+        assert r["route"] == "structured", r["route"]
+        assert len(r["rows"]) == 4, r["rows"]
+        assert r["summary"]["balance_mismatches"] >= 1, r["summary"]
+
+
+def test_docx_input_end_to_end():
+    try:
+        import docx
+    except ImportError:
+        print("SKIP test_docx_input_end_to_end (python-docx not installed)")
+        return
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "test_ledger.docx")
+        doc = docx.Document()
+        table = doc.add_table(rows=4, cols=5)
+        headers = ["Date", "Description", "Debit", "Credit", "Balance"]
+        for j, h in enumerate(headers):
+            table.cell(0, j).text = h
+        data = [
+            ["2026-01-01", "Opening Balance", "", "", "1000.00"],
+            ["2026-01-02", "Deposit", "", "500.00", "1500.00"],
+            ["2026-01-03", "Withdrawal", "200.00", "", "1300.00"],
+        ]
+        for i, row in enumerate(data, start=1):
+            for j, val in enumerate(row):
+                table.cell(i, j).text = val
+        doc.save(path)
+
+        r = process(path)
+        assert r["ok"], r
+        assert r["route"] == "structured", r["route"]
+        assert len(r["rows"]) == 3, r["rows"]
+
+
+def test_docx_export():
+    try:
+        import docx
+    except ImportError:
+        print("SKIP test_docx_export (python-docx not installed)")
+        return
+    import tempfile
+    _ensure_sample()
+    with tempfile.TemporaryDirectory() as td:
+        r = process(SAMPLE, outdir=td)
+        assert r["ok"], r
+        assert "docx" in r["outputs"], r["outputs"]
+        docx_path = r["outputs"]["docx"]
+        assert os.path.exists(docx_path)
+        doc = docx.Document(docx_path)
+        assert len(doc.tables) >= 1
+        tbl = doc.tables[0]
+        from ocr_pipeline.export import COLUMNS
+        assert len(tbl.rows[0].cells) == len(COLUMNS)
+
+
 def _run():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

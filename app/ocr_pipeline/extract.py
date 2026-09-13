@@ -13,11 +13,55 @@ import os
 from typing import List, Dict, Optional
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif"}
+STRUCTURED_EXTS = {".xlsx", ".xlsm", ".docx"}
 SCAN_CHARS_PER_PAGE = 40  # below this average -> treat as scanned
 
 
 def is_image(path: str) -> bool:
     return os.path.splitext(path)[1].lower() in IMAGE_EXTS
+
+
+def extract_structured(path: str) -> List[Dict[str, str]]:
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".xlsx", ".xlsm"):
+        import openpyxl
+        from . import tables as T
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        try:
+            rows: List[Dict[str, str]] = []
+            for ws in wb.worksheets:
+                grid = []
+                for row in ws.iter_rows(values_only=True):
+                    grid_row = []
+                    for cell in row:
+                        if cell is None:
+                            grid_row.append("")
+                        elif hasattr(cell, "strftime"):
+                            grid_row.append(cell.strftime("%Y-%m-%d"))
+                        elif isinstance(cell, (int, float)):
+                            s = str(cell)
+                            if isinstance(cell, float) and s.endswith(".0"):
+                                s = s[:-2]
+                            grid_row.append(s)
+                        else:
+                            grid_row.append(str(cell))
+                    grid.append(grid_row)
+                recs = T._table_to_records(grid)
+                rows.extend(recs)
+            return rows
+        finally:
+            wb.close()
+    if ext == ".docx":
+        import docx  # OPTIONAL — let ImportError propagate to the caller
+        from . import tables as T
+        d = docx.Document(path)
+        rows: List[Dict[str, str]] = []
+        for table in d.tables:
+            grid = [[cell.text for cell in row.cells] for row in table.rows]
+            recs = T._table_to_records(grid)
+            rows.extend(recs)
+        return rows
+    return []
 
 
 def pdf_page_char_counts(path: str) -> List[int]:
