@@ -29,8 +29,11 @@ powershell -ExecutionPolicy Bypass -File installer\build_installer.ps1
 Requires Python 3.12+ (Node not needed).
 
 ```powershell
-pip install -r requirements.txt
+pip install -r requirements.txt -c constraints.txt
 ```
+
+`constraints.txt` pins the exact tested versions (including transitive deps) for a
+reproducible install; drop the `-c` flag only if you deliberately want the latest.
 
 Core deps: `pdfplumber`, `openpyxl`. Optional: `pytesseract` + `requests`.
 
