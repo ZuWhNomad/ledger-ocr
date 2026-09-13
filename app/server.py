@@ -40,7 +40,7 @@ def _base_dir():
 HERE = _base_dir()
 INDEX = os.path.join(HERE, "static", "index.html")
 MAX_BYTES = 40 * 1024 * 1024
-ALLOWED_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".xlsx", ".xlsm", ".docx"}
+ALLOWED_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".webp", ".heic", ".heif", ".xlsx", ".xlsm", ".docx"}
 
 # Strips absolute Windows/Unix paths out of any text before it reaches the client
 # (SEC-P3-5): keep error messages plain-English, never echo local filesystem paths.
@@ -191,7 +191,7 @@ class Handler(BaseHTTPRequestHandler):
         filename = self.headers.get("X-Filename", "upload.pdf")
         ext = os.path.splitext(filename)[1].lower()
         if ext not in ALLOWED_EXT:
-            return self._send(400, json.dumps({"ok": False, "error": f"unsupported file type: {ext}"}))
+            return self._send(400, json.dumps({"ok": False, "error": f"Unsupported file type '{ext}'. Supported: PDF, images (PNG, JPG, HEIC, TIFF, BMP, WEBP, GIF), and spreadsheets/Word (XLSX, XLSM, DOCX)."}))
         length = int(self.headers.get("Content-Length", 0))
         if length <= 0 or length > MAX_BYTES:
             return self._send(400, json.dumps({"ok": False, "error": "empty or too-large upload (max 40MB)"}))
@@ -211,9 +211,14 @@ class Handler(BaseHTTPRequestHandler):
                     "summary": out["summary"],
                     "rows": [_slim(r) for r in out["rows"]],
                 }
+                if out.get("document_shape"):
+                    resp["document_shape"] = out["document_shape"]
+                if out.get("message"):
+                    resp["message"] = out["message"]
                 for kind, mime in (("csv", "text/csv"),
                                    ("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-                                   ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")):
+                                   ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+                                   ("text", "text/plain; charset=utf-8")):
                     p = out["outputs"].get(kind)
                     if p and os.path.exists(p):
                         with open(p, "rb") as f:

@@ -87,6 +87,13 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
         scanned = EX.looks_scanned(path)
         route = "ocr" if scanned else "born-digital"
 
+        if ext in (".heic", ".heif"):
+            try:
+                import pillow_heif
+            except Exception:
+                return {"ok": False, "route": route,
+                        "error": "HEIC/HEIF photos need the optional 'pillow-heif' add-on, which isn't installed. On iPhone set Settings > Camera > Formats > Most Compatible, or convert the photo to JPG/PNG and try again."}
+
         if scanned:
             if not EX.ocr_available():
                 return {"ok": False, "route": route,
@@ -108,12 +115,24 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
     summary["route"] = route
     summary["strategy"] = ocr_method or strategy
 
+    unrecognized = (len(rows) == 0)
+    summary["document_shape"] = "unrecognized" if unrecognized else "ledger"
+
+    outputs = {}
+    if unrecognized:
+        if outdir:
+            os.makedirs(outdir, exist_ok=True)
+            stem = basename or os.path.splitext(os.path.basename(path))[0]
+            outputs["text"] = XP.to_text(EX.raw_text(path, route), os.path.join(outdir, stem + ".txt"))
+        return {"ok": True, "route": route, "summary": summary, "rows": [], "document_shape": "unrecognized",
+                "message": "No bank-statement or ledger table was found in this file. LedgerOCR reads statements and ledgers that have a Date column and money columns (Debit/Credit/Balance, or a single Amount). This file looks like a receipt, letter, or other non-ledger document, so there is nothing to convert into rows. The raw recognized text is available below.",
+                "outputs": outputs}
+
     llm_info = {"enabled": False}
     if use_llm and summary.get("balance_mismatches"):
         llm_info = VAL.validate_flagged(rows, model=llm_model)
     summary["llm"] = llm_info
 
-    outputs = {}
     if outdir:
         os.makedirs(outdir, exist_ok=True)
         stem = basename or os.path.splitext(os.path.basename(path))[0]
@@ -127,4 +146,4 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
         except Exception as e:  # python-docx missing -> CSV/XLSX still delivered
             outputs["docx_error"] = str(e)
 
-    return {"ok": True, "route": route, "summary": summary, "rows": rows, "outputs": outputs}
+    return {"ok": True, "route": route, "summary": summary, "rows": rows, "outputs": outputs, "document_shape": "ledger"}

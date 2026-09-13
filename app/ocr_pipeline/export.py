@@ -34,6 +34,12 @@ def to_csv(rows: List[Dict], path: str) -> str:
     return path
 
 
+def to_text(text: str, path: str) -> str:
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return path
+
+
 def _xlsx_cell(row: Dict, col: str):
     """Cell value for XLSX: money columns become real numbers (exact parsed Decimal, so
     Excel can sum/filter them and no float rounding is introduced); everything else is the
