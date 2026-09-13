@@ -243,8 +243,19 @@ def run_benchmark():
         "",
     ])
 
+    # Preserve any OCR-engine-comparison section appended by bench_ocr.py so running either
+    # benchmark alone never silently drops the other's results.
+    ocr_section = ""
+    marker = "## OCR engine comparison"
+    if os.path.exists(bench_md_path):
+        prev = open(bench_md_path, encoding="utf-8").read()
+        if marker in prev:
+            ocr_section = marker + prev.split(marker, 1)[1].rstrip()
+
     with open(bench_md_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(md_lines))
+        f.write("\n".join(md_lines).rstrip() + "\n")
+        if ocr_section:
+            f.write("\n" + ocr_section + "\n")
 
 
 if __name__ == "__main__":
