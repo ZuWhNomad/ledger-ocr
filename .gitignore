@@ -4,3 +4,11 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+
+# PyInstaller / installer build artifacts (keep the SOURCE: *.spec, *.iss, *.bat, *.ps1)
+installer/build/
+installer/dist/
+installer/Output/
+build/
+dist/
+*.exe

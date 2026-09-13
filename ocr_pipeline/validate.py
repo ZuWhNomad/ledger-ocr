@@ -7,9 +7,11 @@ slow, the pipeline continues and rows keep their deterministic flags.
 """
 from __future__ import annotations
 import json
+import os
 from typing import List, Dict, Optional
 
-DEFAULT_MODEL = "qwen3.8:latest"
+# Light model by default (small cold-start); override with OCR_LLM_MODEL.
+DEFAULT_MODEL = os.environ.get("OCR_LLM_MODEL", "qwen2.5:3b")
 DEFAULT_URL = "http://127.0.0.1:11434/api/generate"
 
 _SYS = (

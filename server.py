@@ -18,11 +18,19 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
+import sys
+
 from ocr_pipeline.pipeline import process
 from ocr_pipeline import extract as EX
 from ocr_pipeline import validate as VAL
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+
+def _base_dir():
+    # When frozen by PyInstaller, bundled data lives under sys._MEIPASS.
+    return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+
+
+HERE = _base_dir()
 INDEX = os.path.join(HERE, "static", "index.html")
 MAX_BYTES = 40 * 1024 * 1024
 ALLOWED_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif"}
@@ -105,21 +113,27 @@ def _slim(r):
     }
 
 
+def serve(host="127.0.0.1", port=8765, open_browser=False):
+    """Start the server. port=0 picks a free port automatically."""
+    srv = ThreadingHTTPServer((host, port), Handler)
+    port = srv.server_address[1]
+    url = f"http://{host}:{port}"
+    print(f"OCR-Pipeline running at {url}  (close this window to stop)")
+    if open_browser:
+        webbrowser.open(url)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        print("\nstopped")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--open", action="store_true")
     args = ap.parse_args()
-    srv = ThreadingHTTPServer((args.host, args.port), Handler)
-    url = f"http://{args.host}:{args.port}"
-    print(f"OCR-Pipeline running at {url}  (Ctrl+C to stop)")
-    if args.open:
-        webbrowser.open(url)
-    try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        print("\nstopped")
+    serve(args.host, args.port, args.open)
 
 
 if __name__ == "__main__":
