@@ -9,6 +9,8 @@ title LedgerOCR Setup
 
 set "SRC=%~dp0LedgerOCR"
 set "DEST=%LOCALAPPDATA%\Programs\LedgerOCR"
+REM (advanced/testing) override the install location:  set LEDGEROCR_DEST=... before running
+if defined LEDGEROCR_DEST set "DEST=%LEDGEROCR_DEST%"
 
 if not exist "%SRC%\LedgerOCR.exe" (
   echo ERROR: cannot find the app files next to this installer.
