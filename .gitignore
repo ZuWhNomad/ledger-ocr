@@ -15,5 +15,5 @@ installer/Output/
 build/
 dist/
 *.exe
-# ...but the shipped setup file at the repo root IS tracked
-!/LedgerOCR-Setup.exe
+# The built Setup.exe is a ~36 MB build artifact — never tracked. Build it with
+# installer/build_installer.ps1; distribute it out-of-band (release page), not in git.
