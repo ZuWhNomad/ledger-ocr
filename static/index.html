@@ -38,22 +38,28 @@
   .flagtext { color:var(--warn); font-size:12px; } .llm{ color:var(--accent); font-size:12px; }
   .tablewrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
   .err { color:var(--warn); }
+  .working { display:flex; align-items:center; gap:10px; }
+  .spinner { width:16px; height:16px; border:2px solid var(--line); border-top-color:var(--accent);
+             border-radius:50%; animation:spin .8s linear infinite; flex:0 0 auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .opts label.disabled { opacity:.5; cursor:not-allowed; }
+  .note { color:var(--mut); font-size:12px; margin-top:6px; }
 </style>
 </head>
 <body>
 <header>
   <h1><span>OCR</span>-Pipeline &mdash; bank statement / ledger &rarr; spreadsheet</h1>
-  <div class="sub">Runs entirely on your machine. No cloud. PDF, or scan/image (PNG/JPG/TIFF).</div>
+  <div class="sub" id="subline">Runs entirely on your machine. No cloud. PDF, or scan/image (PNG/JPG/TIFF).</div>
 </header>
 <main>
   <div id="drop">
-    <h2>Drop a PDF or image here</h2>
-    <p>or click to choose a file</p>
+    <h2 id="dropTitle">Drop a PDF or image here</h2>
+    <p id="dropHint">or click to choose a file</p>
     <input type="file" id="file" hidden accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif">
   </div>
 
   <div class="opts">
-    <label><input type="checkbox" id="llm"> Error-check with local LLM</label>
+    <label id="llmLabel"><input type="checkbox" id="llm"> Error-check with local LLM</label>
     <span>strategy:
       <select id="strategy" style="background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px;">
         <option value="words">words (default)</option>
@@ -71,18 +77,44 @@
 <script>
 const $ = s => document.querySelector(s);
 const drop = $('#drop'), fileEl = $('#file');
+let ENV = { ocr_available:true, llm_available:true };
 
 fetch('/api/env').then(r=>r.json()).then(e=>{
+  ENV = e;
   const o=$('#envOcr'), l=$('#envLlm');
   o.textContent='OCR: '+(e.ocr_available?'ready':'not installed'); o.className='badge '+(e.ocr_available?'on':'off');
   l.textContent='LLM: '+(e.llm_available?e.llm_model:'off'); l.className='badge '+(e.llm_available?'on':'off');
+
+  // PKG-P2-1: don't let the user tick an error-checker that isn't installed.
+  const llmBox=$('#llm'), llmLabel=$('#llmLabel');
+  if(!e.llm_available){
+    llmBox.checked=false; llmBox.disabled=true;
+    llmLabel.classList.add('disabled');
+    llmLabel.title='The optional error-checker (local LLM) is not installed. See the Getting Started guide.';
+  }
+
+  // PKG-P1-2: only advertise scans/photos when the OCR add-on is actually present.
+  if(!e.ocr_available){
+    $('#subline').textContent='Runs entirely on your machine. No cloud. Born-digital PDFs (exported from your bank or accounting software).';
+    $('#dropTitle').textContent='Drop a PDF here';
+    $('#dropHint').innerHTML='or click to choose a file<div class="note">Scanned/photographed statements need the free OCR add-on — see the Getting Started guide.</div>';
+    fileEl.setAttribute('accept','.pdf');
+  }
 }).catch(()=>{});
 
 drop.onclick = ()=> fileEl.click();
-fileEl.onchange = ()=> fileEl.files[0] && upload(fileEl.files[0]);
+fileEl.onchange = ()=> handleFiles(fileEl.files);
 ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot');}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot');}));
-drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) upload(f); });
+drop.addEventListener('drop', e=>{ handleFiles(e.dataTransfer.files); });
+
+// PKG-P3-5: only the first file is processed; tell the user rather than silently dropping the rest.
+function handleFiles(files){
+  if(!files || !files.length) return;
+  const extra = files.length>1
+    ? ` <span class="note">(${files.length-1} other file${files.length>2?'s':''} ignored — this tool processes one at a time)</span>` : '';
+  upload(files[0], extra);
+}
 
 function b64ToBlob(b64, mime){ const bin=atob(b64); const a=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return new Blob([a],{type:mime}); }
@@ -91,20 +123,26 @@ function dlBtn(label, b64, mime, name){
   a.href=URL.createObjectURL(b64ToBlob(b64,mime)); a.download=name; return a;
 }
 
-async function upload(file){
+async function upload(file, extraNote){
   $('#summary').innerHTML=''; $('#dl').innerHTML=''; $('#result').innerHTML='';
-  $('#status').innerHTML = 'Processing <b>'+file.name+'</b> &hellip;';
-  const qs = new URLSearchParams({ strategy:$('#strategy').value, llm: $('#llm').checked?'1':'0' });
+  const llmOn = $('#llm').checked;
+  // PKG-P2-3: an animated spinner + honest "this can take a while" so a long OCR/LLM
+  // run never looks frozen.
+  const hint = llmOn ? ' — error-checking a scan can take a minute or two'
+                     : ' — this can take a minute for large scans';
+  $('#status').innerHTML = '<span class="working"><span class="spinner"></span>'
+    + 'Working on <b>'+escapeHtml(file.name)+'</b>'+hint+'</span>' + (extraNote||'');
+  const qs = new URLSearchParams({ strategy:$('#strategy').value, llm: llmOn?'1':'0' });
   try{
     const r = await fetch('/api/process?'+qs, { method:'POST',
       headers:{'X-Filename':file.name}, body:file });
     const d = await r.json();
-    if(!d.ok){ $('#status').innerHTML = '<span class="err">'+ (d.error||'failed') +'</span>'; return; }
-    render(d);
-  }catch(err){ $('#status').innerHTML = '<span class="err">'+err+'</span>'; }
+    if(!d.ok){ $('#status').innerHTML = '<span class="err">'+ escapeHtml(d.error||'failed') +'</span>'; return; }
+    render(d, llmOn);
+  }catch(err){ $('#status').innerHTML = '<span class="err">'+escapeHtml(String(err))+'</span>'; }
 }
 
-function render(d){
+function render(d, llmRequested){
   const s=d.summary;
   $('#status').innerHTML = 'Done &mdash; route: <b>'+d.route+'</b>, strategy: <b>'+s.strategy+'</b>';
   const chips=[
@@ -117,7 +155,15 @@ function render(d){
   } else {
     html += `<div class="chip ${s.balance_mismatches?'warn':''}">balance mismatches: <b>${s.balance_mismatches}</b></div>`;
   }
-  if(s.llm && s.llm.enabled) html += `<div class="chip">LLM checked: <b>${s.llm.checked}</b> (${s.llm.model})</div>`;
+  if(s.llm && s.llm.enabled){
+    html += `<div class="chip">LLM checked: <b>${s.llm.checked}</b> (${escapeHtml(s.llm.model||'')})</div>`;
+  } else if(llmRequested){
+    // PKG-P2-1: the box was ticked but no LLM column appeared — say why, don't leave the user guessing.
+    const why = (s.llm && s.llm.reason==='ollama_unavailable')
+      ? 'error-checker not available'
+      : 'no math problems to check';
+    html += `<div class="chip">error-check skipped: <b>${why}</b></div>`;
+  }
   $('#summary').innerHTML = html;
 
   const base=(d.filename||'result').replace(/\.[^.]+$/,'');

@@ -1,7 +1,11 @@
 # Getting Started with LedgerOCR
 
-LedgerOCR turns a bank statement or ledger (PDF, or a scan/photo) into a clean spreadsheet.
+LedgerOCR turns a **bank statement or ledger PDF** into a clean spreadsheet.
 Everything happens on your own computer — your financial documents are never uploaded anywhere.
+
+Born-digital PDFs (the ones you download or export from your bank or accounting software) work
+out of the box. **Scans and phone photos** of paper statements need a small, free add-on — see
+[*Reading scans and photos*](#reading-scans-and-photos) below.
 
 You do **not** need to install Python, use a command line, or understand any settings.
 
@@ -11,20 +15,29 @@ You do **not** need to install Python, use a command line, or understand any set
 
 **If you were given `LedgerOCR-Setup.exe`:**
 1. Double-click **`LedgerOCR-Setup.exe`**.
-2. Click **Next** / **Install** through the short wizard.
-3. When asked *"Install the smart error-checker?"* — leave it checked if you want the app to
-   double-check the math on your statements (this downloads a helper the first time and takes a
-   few minutes). You can safely **uncheck** it; the app still works fully.
-4. Click **Finish**. LedgerOCR opens automatically.
+2. **If Windows shows a blue "Windows protected your PC" box:** this is normal for a new app
+   that hasn't built up a reputation yet — it is **not** a virus warning. Click the small
+   **"More info"** link, then click the **"Run anyway"** button that appears. (If you don't see
+   "More info", the window may be narrow — widen it, or look just under the message text.)
+3. Click **Next** / **Install** through the short wizard.
+4. The wizard offers an optional *"smart error-checker"* — it is **unchecked** by default because
+   it downloads about 2 GB. Tick it only if you want the app to also suggest *why* a row looks
+   wrong; the app double-checks the math either way. If you tick it, the download runs in its own
+   window and you can start using LedgerOCR straight away.
+5. Click **Finish**. LedgerOCR opens automatically.
 
 **If you were given a folder with `INSTALL.bat` inside:**
 1. Unzip the folder if it came as a `.zip` (right-click → **Extract All**).
-2. Double-click **`INSTALL.bat`**.
-3. A black window appears. When it asks *"Install the smart error-checker now?"*, press **Y**
-   (recommended) or **N** to skip. Then wait for it to finish.
+2. Double-click **`INSTALL.bat`**. If Windows shows a **"Windows protected your PC"** box, click
+   **"More info" → "Run anyway"** (see the note above — this is expected for a new app).
+3. A black window appears. When it asks *"Install the smart error-checker now?"*, press **Y** to
+   set it up (a ~2 GB download) or **N** to skip — the app works fully either way. Then wait.
 4. The app opens automatically.
 
 A **LedgerOCR** icon is now on your Desktop and in your Start Menu.
+
+To remove LedgerOCR later, use **Settings → Apps** (look for *LedgerOCR*) or run **`UNINSTALL.bat`**
+in the install folder. It will also offer to delete the ~2 GB error-check model if you added it.
 
 ---
 
@@ -33,7 +46,8 @@ A **LedgerOCR** icon is now on your Desktop and in your Start Menu.
 1. Double-click the **LedgerOCR** icon on your Desktop.
 2. A small window opens, and your web browser opens to the LedgerOCR page. (Leave the small
    window alone — it just needs to stay open while you work.)
-3. **Drag a PDF, scan, or photo of a statement onto the big drop area** — or click it to pick a file.
+3. **Drag a statement PDF onto the big drop area** — or click it to pick a file. (To read a
+   scan or photo, first set up the OCR add-on — see [*Reading scans and photos*](#reading-scans-and-photos).)
 4. In a moment you'll see the transactions in a table.
    - Rows with a math problem (the running balance doesn't add up) are **highlighted**.
 5. Click **Download CSV** or **Download XLSX** to save the spreadsheet wherever you like
@@ -59,4 +73,31 @@ That's it.
 - **Clear scans work best.** For paper statements, a straight, high-quality scan reads far better
   than a crooked phone photo.
 - **Trouble opening it?** If your browser didn't open, look for the small LedgerOCR window; it
-  shows a web address like `http://127.0.0.1:8765` — type that into your browser.
+  shows a web address like `http://127.0.0.1:...` (the exact number can vary) — type the address
+  shown in that window into your browser.
+
+---
+
+## Reading scans and photos
+
+The base app reads **born-digital PDFs** — statements you download or export from your bank or
+accounting software. Those need nothing extra.
+
+To read **scanned or photographed** paper statements, LedgerOCR needs a small, free add-on called
+**Tesseract** (an offline text-recognition engine — it also runs entirely on your machine). Until
+it is installed, the app shows only PDF as the accepted type and will tell you if a dropped file
+needs it.
+
+To install the add-on (one time):
+
+1. Open the Start menu, type **Command Prompt**, and open it.
+2. Paste this and press Enter:
+   ```
+   winget install UB-Mannheim.TesseractOCR
+   ```
+3. Close and reopen LedgerOCR. The **OCR** badge should now read **"ready"**, and you can drop
+   scans and photos.
+
+If you don't have `winget`, download the installer from
+<https://github.com/UB-Mannheim/tesseract/wiki> and run it. If you install it to a custom folder,
+ask whoever set up LedgerOCR for you to set the `OCR_TESSERACT` path.

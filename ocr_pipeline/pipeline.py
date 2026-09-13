@@ -64,8 +64,10 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
     if scanned:
         if not EX.ocr_available():
             return {"ok": False, "route": route,
-                    "error": "This document has no text layer and Tesseract OCR is not installed. "
-                             "Install Tesseract (see README) to process scans/images."}
+                    "error": "This looks like a scan or photo, which needs the free OCR add-on "
+                             "to read. Born-digital PDFs (exported from your bank or accounting "
+                             "software) work without it. To read scans and photos, install the OCR "
+                             "add-on — see \"Reading scans and photos\" in the Getting Started guide."}
         text = EX.ocr_to_text(path)
         raw = parse_text_rows(text)
     else:

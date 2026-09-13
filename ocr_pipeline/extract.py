@@ -109,14 +109,25 @@ def ocr_to_text(path: str, dpi: int = 300) -> str:
             "or https://github.com/UB-Mannheim/tesseract/wiki) or set OCR_TESSERACT to the exe path."
         )
     import pytesseract
+    import tempfile
     from PIL import Image
     texts: List[str] = []
-    if is_image(path):
-        texts.append(pytesseract.image_to_string(Image.open(path)))
-    else:
-        import pdfplumber
-        with pdfplumber.open(path) as pdf:
-            for page in pdf.pages:
-                img = page.to_image(resolution=dpi).original  # PIL image via pypdfium2
-                texts.append(pytesseract.image_to_string(img))
+    # SEC-P3-4: pytesseract writes each page image to a NamedTemporaryFile in the OS
+    # temp dir before shelling out to tesseract. Point tempfile at a scoped dir that is
+    # purged on exit (even on crash) so no rendered statement page lingers in %TEMP%.
+    # (Single-user local app: one file processed at a time, so the process-wide swap is safe.)
+    with tempfile.TemporaryDirectory(prefix="ledgerocr_ocr_") as ocr_tmp:
+        prev_tmp = tempfile.tempdir
+        tempfile.tempdir = ocr_tmp
+        try:
+            if is_image(path):
+                texts.append(pytesseract.image_to_string(Image.open(path)))
+            else:
+                import pdfplumber
+                with pdfplumber.open(path) as pdf:
+                    for page in pdf.pages:
+                        img = page.to_image(resolution=dpi).original  # PIL image via pypdfium2
+                        texts.append(pytesseract.image_to_string(img))
+        finally:
+            tempfile.tempdir = prev_tmp
     return "\n".join(texts)

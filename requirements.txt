@@ -12,3 +12,6 @@ reportlab>=4.0          # generates the synthetic sample PDF in samples/make_sam
 # Notes:
 # - Pillow and pypdfium2 come in as pdfplumber dependencies.
 # - No PyMuPDF (AGPL) / camelot (Ghostscript) / tabula (Java): avoided on purpose (see PLAN.md).
+# - For a reproducible, tamper-evident install pin exact versions with the lockfile:
+#       pip install -r requirements.txt -c constraints.txt
+#   (constraints.txt holds the tested versions, incl. transitive deps.)

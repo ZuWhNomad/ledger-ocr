@@ -11,8 +11,10 @@ leaves this machine.
 from __future__ import annotations
 import argparse
 import base64
+import ipaddress
 import json
 import os
+import re
 import tempfile
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,8 +37,35 @@ INDEX = os.path.join(HERE, "static", "index.html")
 MAX_BYTES = 40 * 1024 * 1024
 ALLOWED_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif"}
 
+# Strips absolute Windows/Unix paths out of any text before it reaches the client
+# (SEC-P3-5): keep error messages plain-English, never echo local filesystem paths.
+_PATH_RE = re.compile(r"[A-Za-z]:\\[^\s'\"]+|(?:/[^\s'\"/]+){2,}/?")
+
+
+def _friendly_error(e: Exception) -> str:
+    """Map a raw pipeline exception to a plain-English, path-free message.
+
+    Covers the common layperson case (password-protected / corrupt PDFs) and, for
+    anything else, sanitizes local paths out of the text before returning it.
+    """
+    name = type(e).__name__
+    msg = str(e)
+    low = (name + " " + msg).lower()
+    if "password" in low or "encrypt" in low or "decrypt" in low:
+        return ("This PDF is password-protected. Open it and remove the password "
+                "(for example, re-save or \"Print to PDF\" without a password), then try again.")
+    if "no /root" in low or "eof" in low or "syntaxerror" in low or "not a pdf" in low \
+            or "cannot open" in low or "damaged" in low or "invalid" in low:
+        return "This file could not be read — it may be corrupt or not a valid PDF/image. Try re-exporting or re-scanning it."
+    safe = _PATH_RE.sub("[path]", msg).strip()
+    return f"Sorry, this file could not be processed ({name}). {safe}".strip()
+
 
 class Handler(BaseHTTPRequestHandler):
+    # Set by serve(): the exact Host header values accepted, or None to disable the
+    # check (only when the operator opted into LAN binding via --allow-lan).
+    allowed_hosts = None
+
     def _send(self, code, body, ctype="application/json"):
         data = body if isinstance(body, bytes) else body.encode("utf-8")
         self.send_response(code)
@@ -48,7 +77,20 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):  # quiet
         pass
 
+    def _host_ok(self) -> bool:
+        """Reject requests whose Host header isn't the local server (SEC-P3-1).
+
+        Defense-in-depth against DNS-rebinding: a rebound remote name resolves to
+        127.0.0.1 but still carries its own Host header, which won't be in the set.
+        """
+        if type(self).allowed_hosts is None:
+            return True
+        host = (self.headers.get("Host") or "").strip().lower()
+        return host in type(self).allowed_hosts
+
     def do_GET(self):
+        if not self._host_ok():
+            return self._send(403, json.dumps({"error": "forbidden host"}))
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
             with open(INDEX, "rb") as f:
@@ -62,6 +104,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, json.dumps({"error": "not found"}))
 
     def do_POST(self):
+        if not self._host_ok():
+            return self._send(403, json.dumps({"error": "forbidden host"}))
         parsed = urlparse(self.path)
         if parsed.path != "/api/process":
             return self._send(404, json.dumps({"error": "not found"}))
@@ -99,7 +143,7 @@ class Handler(BaseHTTPRequestHandler):
                             resp[kind + "_b64"] = base64.b64encode(f.read()).decode()
                 return self._send(200, json.dumps(resp))
         except Exception as e:
-            return self._send(200, json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}))
+            return self._send(200, json.dumps({"ok": False, "error": _friendly_error(e)}))
 
 
 def _slim(r):
@@ -113,12 +157,38 @@ def _slim(r):
     }
 
 
-def serve(host="127.0.0.1", port=8765, open_browser=False):
+def _is_loopback(host: str) -> bool:
+    if host.lower() in ("localhost", ""):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _host_header_allowlist(host: str, port: int):
+    """The Host header values we accept. For a loopback bind, the fixed local names;
+    for a LAN bind (--allow-lan) return None to disable the check (operator opted in)."""
+    if not _is_loopback(host):
+        return None
+    names = ["127.0.0.1", "localhost", "[::1]", "::1"]
+    allowed = set()
+    for n in names:
+        allowed.add(f"{n}:{port}")
+        allowed.add(n)
+    return allowed
+
+
+def serve(host="127.0.0.1", port=8765, open_browser=False, allow_lan=False):
     """Start the server. port=0 picks a free port automatically."""
     srv = ThreadingHTTPServer((host, port), Handler)
-    port = srv.server_address[1]
+    port = srv.server_address[1]  # resolve the real port (port=0 -> OS-assigned) first
+    Handler.allowed_hosts = _host_header_allowlist(host, port)
     url = f"http://{host}:{port}"
     print(f"OCR-Pipeline running at {url}  (close this window to stop)")
+    if not _is_loopback(host):
+        print("  WARNING: bound to a non-loopback address. This service has NO "
+              "authentication — anyone on your network can upload files and read results.")
     if open_browser:
         webbrowser.open(url)
     try:
@@ -132,8 +202,15 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--open", action="store_true")
+    ap.add_argument("--allow-lan", action="store_true",
+                    help="allow binding a non-loopback address (exposes an UNAUTHENTICATED "
+                         "file service to your LAN); required to bind anything but localhost")
     args = ap.parse_args()
-    serve(args.host, args.port, args.open)
+    if not _is_loopback(args.host) and not args.allow_lan:
+        ap.error(f"refusing to bind non-loopback host {args.host!r}: there is no authentication, "
+                 f"so this would expose an open file-processing service to your network. "
+                 f"Re-run with --allow-lan only if you understand and accept that risk.")
+    serve(args.host, args.port, args.open, allow_lan=args.allow_lan)
 
 
 if __name__ == "__main__":
