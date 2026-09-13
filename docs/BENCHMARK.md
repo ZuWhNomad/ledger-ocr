@@ -39,14 +39,14 @@ The benchmark evaluates the deterministic `words` strategy across seven syntheti
 
 | Fixture | Path A F1 (image_to_string) | Path A Time (s) | Path B F1 (image_to_data) | Path B Time (s) |
 | :--- | :---: | :---: | :---: | :---: |
-| `base_ruled` | 0.7671 | 1.01 | 0.9778 | 0.96 |
+| `base_ruled` | 0.7671 | 1.01 | 0.9778 | 0.94 |
 | `bleed_description` | 0.0000 | 0.59 | 1.0000 | 0.57 |
-| `eu_format` | 0.0000 | 0.60 | 1.0000 | 0.57 |
-| `full_grid` | 0.6667 | 0.67 | 0.0000 | 0.67 |
-| `single_amount` | 0.0000 | 0.59 | 1.0000 | 0.56 |
-| `two_page` | 1.0000 | 1.05 | 1.0000 | 1.01 |
-| `two_tables` | 0.0000 | 0.66 | 0.8421 | 0.62 |
-| **Aggregate** | **0.5419** | **5.17** | **0.9140** | **4.97** |
+| `eu_format` | 0.0000 | 0.58 | 1.0000 | 0.56 |
+| `full_grid` | 0.6667 | 0.68 | 0.0000 | 0.65 |
+| `single_amount` | 0.0000 | 0.58 | 1.0000 | 0.56 |
+| `two_page` | 1.0000 | 1.05 | 1.0000 | 0.98 |
+| `two_tables` | 0.0000 | 0.63 | 0.8421 | 0.59 |
+| **Aggregate** | **0.5419** | **5.12** | **0.9140** | **4.85** |
 
 ### Methodology
 
