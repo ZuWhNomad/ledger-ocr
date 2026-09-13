@@ -14,6 +14,7 @@ sys.path.insert(0, ROOT)
 
 from ocr_pipeline.pipeline import process, parse_text_rows  # noqa: E402
 from ocr_pipeline import reconcile as RC  # noqa: E402
+from ocr_pipeline import extract as EX  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "samples", "bank_statement.pdf")
 
@@ -363,6 +364,63 @@ def test_suggest_from_prefers_default_then_smallest():
 
     # 4. Empty list -> None
     assert VAL.suggest_from([]) is None
+
+
+def test_webp_and_heic_are_images():
+    assert ".webp" in EX.IMAGE_EXTS and ".heic" in EX.IMAGE_EXTS and EX.is_image("x.webp")
+
+
+def test_docx_no_table_unrecognized():
+    try:
+        import docx
+    except ImportError:
+        print("SKIP test_docx_no_table_unrecognized (python-docx not installed)")
+        return
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "no_table.docx")
+        doc = docx.Document()
+        doc.add_paragraph("This is a document with text but no tables.")
+        doc.save(path)
+
+        r = process(path, outdir=td)
+        assert r["ok"], r
+        assert r["document_shape"] == "unrecognized", r["document_shape"]
+        assert len(r["rows"]) == 0, r["rows"]
+        assert "message" in r, r
+        assert "csv" not in r["outputs"], r["outputs"]
+        assert r["outputs"].get("text") and os.path.exists(r["outputs"]["text"])
+
+
+def test_ledger_still_recognized():
+    _ensure_sample()
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        r = process(SAMPLE, outdir=td, strategy="words")
+        assert r["ok"], r
+        assert r["document_shape"] == "ledger", r["document_shape"]
+        assert len(r["rows"]) > 0, r["rows"]
+        assert r["outputs"].get("csv") and os.path.exists(r["outputs"]["csv"])
+
+
+def test_receipt_photo_unrecognized():
+    jpg_path = os.path.join(ROOT, "tests", "fixtures", "real", "receipt_pharmacy.jpg")
+    if not EX.ocr_available():
+        print("SKIP test_receipt_photo_unrecognized (Tesseract not installed)")
+        return
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        r = process(jpg_path, outdir=td)
+        assert r["ok"], r
+        assert r["document_shape"] == "unrecognized", r["document_shape"]
+        assert len(r["rows"]) == 0, r["rows"]
+        assert "message" in r, r
+        assert "csv" not in r["outputs"], r["outputs"]
+        text_file = r["outputs"].get("text")
+        assert text_file and os.path.exists(text_file)
+        with open(text_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert len(content) > 0, content
 
 
 def _run():

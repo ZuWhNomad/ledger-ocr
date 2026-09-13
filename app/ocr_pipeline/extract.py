@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from typing import List, Dict, Optional
 
-IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif"}
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".webp", ".heic", ".heif"}
 STRUCTURED_EXTS = {".xlsx", ".xlsm", ".docx"}
 SCAN_CHARS_PER_PAGE = 40  # below this average -> treat as scanned
 
@@ -152,12 +152,45 @@ def _iter_page_images(path: str, dpi: int = 300):
     no AGPL-licensed PyMuPDF."""
     from PIL import Image
     if is_image(path):
+        ext = os.path.splitext(path)[1].lower()
+        if ext in (".heic", ".heif"):
+            try:
+                import pillow_heif
+                pillow_heif.register_heif_opener()
+            except Exception:
+                pass
         yield Image.open(path)
     else:
         import pdfplumber
         with pdfplumber.open(path) as pdf:
             for page in pdf.pages:
                 yield page.to_image(resolution=dpi).original
+
+
+def raw_text(path: str, route: str = "") -> str:
+    """Best-effort extract raw text when no table structure is recognized. Never raises."""
+    try:
+        ext = os.path.splitext(path)[1].lower()
+        if ext in STRUCTURED_EXTS:
+            return ""
+        if is_image(path) or "ocr" in route:
+            try:
+                return ocr_to_text(path)
+            except Exception:
+                return ""
+        try:
+            import pdfplumber
+            texts = []
+            with pdfplumber.open(path) as pdf:
+                for page in pdf.pages:
+                    t = page.extract_text()
+                    if t:
+                        texts.append(t)
+            return "\n".join(texts)
+        except Exception:
+            return ""
+    except Exception:
+        return ""
 
 
 def _ocr_scope():
