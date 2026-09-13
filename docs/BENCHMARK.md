@@ -55,3 +55,19 @@ Evaluates local Tesseract OCR on clean 300-dpi rasterized PIL images generated f
 **RECOMMENDATION:** Path B (image_to_data) clearly outperforms Path A (image_to_string) (Aggregate micro-F1: **0.9140** vs **0.5419**, a gain of **+0.3720** F1 points). Path B disambiguates distinct debit/credit columns, keeps wide descriptions out of the money cells, and carries column boundaries across continuation pages.
 
 **ADOPTED IN PRODUCTION:** `pipeline.process` now uses the Path B word-box path for every scan/image, falling back to the Path A text-line parser only when Path B recovers no rows (e.g. heavy full-grid borders defeat header OCR under `--psm 6`, as in the `full_grid` fixture, F1 0.00 here -> the fallback then applies). Net production accuracy on a page is therefore at least the better of the two.
+
+## Real-world vs synthetic (photo robustness)
+
+- The headline F1 ~0.99 and OCR 0.54->0.94 numbers are measured on CLEAN 300-dpi synthetic born-digital renders and are an UPPER BOUND; they overstate accuracy on real photographed documents.
+- Measured clean-render vs simulated-phone-photo F1 for both OCR paths: the word-box path collapsed from 0.9778 to 0.0000 (drop of 0.9778), and the text-line path fell from 0.7671 to 0.3429 (drop of 0.4243). A few degrees of skew defeats header/column anchoring, so a real phone photo can extract *worse* than the clean-render numbers suggest.
+- These are SIMULATED degradations, NOT real photographs; no real photographed BANK-STATEMENT fixture exists yet.
+- The one real phone photo available is a pharmacy receipt, which is out of ledger scope; the pipeline now correctly flags it as document_shape=unrecognized rather than emitting an empty ledger CSV. Recognized character count: 508.
+
+### Degradation Results Table
+
+| Variant | Path | Precision | Recall | F1 | TP | FP | FN |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `clean-render` | `word-box` | 0.9565 | 1.0000 | 0.9778 | 44 | 2 | 0 |
+| `clean-render` | `text-line` | 0.9655 | 0.6364 | 0.7671 | 28 | 1 | 16 |
+| `sim-photo` | `word-box` | 0.0000 | 0.0000 | 0.0000 | 0 | 47 | 44 |
+| `sim-photo` | `text-line` | 0.4615 | 0.2727 | 0.3429 | 12 | 14 | 32 |
