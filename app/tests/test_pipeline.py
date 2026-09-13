@@ -293,6 +293,78 @@ def test_docx_export():
         assert len(tbl.rows[0].cells) == len(COLUMNS)
 
 
+def test_get_model_precedence():
+    import tempfile
+    from ocr_pipeline import validate as VAL
+    old_env = os.environ.get("OCR_LLM_MODEL")
+    old_cfg_env = os.environ.get("LEDGEROCR_CONFIG")
+    with tempfile.TemporaryDirectory() as td:
+        cfg_file = os.path.join(td, "config.json")
+        os.environ["LEDGEROCR_CONFIG"] = cfg_file
+        VAL.set_model("config-model")
+        os.environ["OCR_LLM_MODEL"] = "env-model"
+        try:
+            assert VAL.get_model() == "env-model"
+        finally:
+            if old_env is not None:
+                os.environ["OCR_LLM_MODEL"] = old_env
+            else:
+                os.environ.pop("OCR_LLM_MODEL", None)
+            if old_cfg_env is not None:
+                os.environ["LEDGEROCR_CONFIG"] = old_cfg_env
+            else:
+                os.environ.pop("LEDGEROCR_CONFIG", None)
+
+
+def test_set_get_model_roundtrip():
+    import tempfile
+    from ocr_pipeline import validate as VAL
+    old_env = os.environ.pop("OCR_LLM_MODEL", None)
+    old_cfg_env = os.environ.get("LEDGEROCR_CONFIG")
+    with tempfile.TemporaryDirectory() as td:
+        cfg_file = os.path.join(td, "config.json")
+        os.environ["LEDGEROCR_CONFIG"] = cfg_file
+        try:
+            VAL.set_model("custom-model-x")
+            assert VAL.get_model() == "custom-model-x"
+        finally:
+            if old_env is not None:
+                os.environ["OCR_LLM_MODEL"] = old_env
+            if old_cfg_env is not None:
+                os.environ["LEDGEROCR_CONFIG"] = old_cfg_env
+            else:
+                os.environ.pop("LEDGEROCR_CONFIG", None)
+
+
+def test_suggest_from_prefers_default_then_smallest():
+    from ocr_pipeline import validate as VAL
+    # 1. Include DEFAULT_MODEL fitting+json_ok, a big one not fitting, a fitting one that failed json
+    models1 = [
+        {"name": VAL.DEFAULT_MODEL, "size_gb": 1.9, "fits_ram": True, "json_ok": True, "latency_s": 3.6},
+        {"name": "huge-model", "size_gb": 30.0, "fits_ram": False, "json_ok": None, "latency_s": None},
+        {"name": "broken-model", "size_gb": 1.0, "fits_ram": True, "json_ok": False, "latency_s": 1.2},
+    ]
+    assert VAL.suggest_from(models1) == VAL.DEFAULT_MODEL
+
+    # 2. List WITHOUT DEFAULT_MODEL where two fit and pass -> returns the smaller
+    models2 = [
+        {"name": "model-b", "size_gb": 5.0, "fits_ram": True, "json_ok": True, "latency_s": 2.0},
+        {"name": "model-a", "size_gb": 2.0, "fits_ram": True, "json_ok": True, "latency_s": 4.0},
+    ]
+    assert VAL.suggest_from(models2) == "model-a"
+
+    # 3. List where none pass json but some fit -> returns smallest fitting
+    models3 = [
+        {"name": "fit-large", "size_gb": 8.0, "fits_ram": True, "json_ok": False, "latency_s": 1.0},
+        {"name": "fit-small", "size_gb": 3.0, "fits_ram": True, "json_ok": False, "latency_s": 1.0},
+        {"name": "no-fit", "size_gb": 25.0, "fits_ram": False, "json_ok": None, "latency_s": None},
+    ]
+    assert VAL.suggest_from(models3) == "fit-small"
+
+    # 4. Empty list -> None
+    assert VAL.suggest_from([]) is None
+
+
 def _run():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
@@ -312,3 +384,4 @@ def _run():
 
 if __name__ == "__main__":
     sys.exit(1 if _run() else 0)
+

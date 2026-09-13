@@ -3,8 +3,9 @@ LEDGER OCR
 ================================================================================
 
 WHAT IT DOES
-Ledger OCR converts bank-statement and general-ledger PDFs, scans, and photos
-into clean spreadsheets (CSV and Excel .xlsx).
+Ledger OCR turns bank statements and general ledgers into clean, ready-to-use
+tables. It reads PDFs, scans, and photos, and also Excel and Word files, and
+saves the result as CSV, Excel (.xlsx), or Word (.docx).
 
 Everything runs 100% locally on your computer. No internet connection is
 required, no cloud services are used, and nothing is uploaded. Confidential
@@ -20,12 +21,12 @@ INSTALLATION
 HOW TO USE
 1. Open "Ledger OCR" from the Desktop or Start menu (or double-click run.cmd).
    Your web browser opens a local page.
-2. Drag a PDF or image onto the drop area (or click to choose a file). Wait a
-   few seconds.
+2. Drag a PDF, image, Excel, or Word file onto the drop area (or click to
+   choose a file). Wait a few seconds.
 3. A table preview of the transactions appears. Rows the tool thinks may
    contain an error are highlighted.
-4. Click "Download CSV" or "Download XLSX". The file saves to your Downloads
-   folder. Open it in Excel or Google Sheets.
+4. Click "Download CSV", "Download XLSX" (Excel), or "Download DOCX" (Word).
+   The file saves to your Downloads folder. Open it in Excel or Google Sheets.
 
 For detailed step-by-step guidance, see GETTING_STARTED.txt.
 
@@ -42,8 +43,10 @@ OPTIONAL ERROR-CHECKER
   flagged.
 - It never changes your numbers, and it runs entirely on your computer.
 - It stays off unless it is installed and you turn it on.
-- (Advanced, safe to ignore: power users can change which local model it uses
-  via the OCR_LLM_MODEL setting.)
+- The app suggests a suitable local assistant automatically. To use a different
+  one, click "Choose model" in the app and pick from the list; it is remembered.
+- (Advanced, safe to ignore: power users can also set the model with the
+  OCR_LLM_MODEL setting.)
 
 
 PRIVACY AND OFFLINE USE
