@@ -12,7 +12,11 @@ hiddenimports = ["ocr_pipeline"]
 
 # pdfplumber pulls pdfminer + pypdfium2 (native .dll used for rasterization); collect
 # their data/binaries so the frozen app has no missing-DLL / missing-module surprises.
-for pkg in ("pdfplumber", "pypdfium2", "pypdfium2_raw", "pdfminer", "openpyxl", "pytesseract", "PIL"):
+# `requests` (+ its certifi CA bundle) is required for the optional local-Ollama error-check
+# and the model sweep: it is imported lazily and swallowed on ImportError, so without it the
+# FROZEN app would silently report the LLM as unavailable even when Ollama is running.
+for pkg in ("pdfplumber", "pypdfium2", "pypdfium2_raw", "pdfminer", "openpyxl", "pytesseract",
+            "PIL", "requests", "certifi", "urllib3", "charset_normalizer", "idna"):
     try:
         d, b, h = collect_all(pkg)
         datas += d
