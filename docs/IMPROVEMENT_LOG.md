@@ -2,6 +2,33 @@
 
 Dated entries, newest first. Each phase of the production-readiness pass appends here.
 
+## 2026-09-13 — Phase 4A: Benchmark harness + ground-truth fixtures
+
+**Added**
+- `app/tests/fixtures/generate.py` — deterministic reportlab generator for 7 born-digital
+  fixture shapes (reusing the existing `samples/make_sample.py` builders where a shape exists):
+  base ruled statement, single signed-amount column, two-page (header only on page 1),
+  wrapped/bleeding description, full-grid (v+h rules), EU number formats (`1.234,56`), and two
+  tables on one page. Each fixture is committed as `<name>.pdf` + `<name>.expected.csv`
+  (columns: date,description,debit,credit,amount,balance,flag).
+- `app/tests/bench.py` — runs the `words` strategy over every fixture, greedily aligns rows to
+  ground truth, and reports micro-F1 on `(date,debit,credit,balance)`, row recall, and the
+  balance-error catch rate. Writes `docs/BENCHMARK.md`.
+
+**Verified (ran myself, not the worker's word)**
+- `python app/tests/fixtures/generate.py` regenerates all 7 fixtures with no stray output.
+- `python app/tests/bench.py`: **micro-F1 0.9948** (P 0.9897 / R 1.0000), **row recall 38/38**,
+  **balance catch rate 2/2 (100%)**. Writes only to `docs/BENCHMARK.md`.
+- `python app/tests/test_pipeline.py` still 11/11.
+
+**Finding surfaced by the benchmark**
+- The one false positive is on `two_tables`: a section title row ("Account 2: Savings") matches
+  the date-like heuristic and becomes a spurious extra row (5 predicted vs 4 truth). Multi-table
+  pages are listed as future work in `docs/PLAN.md`; the benchmark now quantifies the gap.
+
+**Cleanup**
+- Removed concurrent-worker strays (`app/docs/BENCHMARK.md`, `app/samples/test_make_*.pdf`).
+
 ## 2026-09-13 — Phase 3: Plain-language README & Getting Started
 
 **Changed**

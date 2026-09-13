@@ -1,0 +1,5 @@
+date,description,debit,credit,amount,balance,flag
+2026-01-02,Opening,,,0.00,1000.00,
+2026-01-03,Buy A,,,-100.00,900.00,
+2026-01-04,Buy B,,,-50.00,850.00,
+2026-01-05,Buy C,,,-25.00,825.00,

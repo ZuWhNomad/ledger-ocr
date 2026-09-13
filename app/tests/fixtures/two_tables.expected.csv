@@ -1,0 +1,5 @@
+date,description,debit,credit,amount,balance,flag
+2026-05-01,Checking Start,,,0.00,2000.00,
+2026-05-02,Deposit A,,,500.00,2500.00,
+2026-05-01,Savings Start,,,0.00,10000.00,
+2026-05-03,Interest Earned,,,15.00,10015.00,

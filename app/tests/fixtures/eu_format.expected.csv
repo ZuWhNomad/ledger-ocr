@@ -1,0 +1,5 @@
+date,description,debit,credit,amount,balance,flag
+2026-04-01,Start balance,,,,"5.000,00",
+2026-04-02,Equipment Purchase,"1.234,56",,,"3.765,44",
+2026-04-03,EU Invoice Payment,,"2.500,00",,"6.265,44",
+2026-04-04,Software License,"300,00",,,"5.965,44",
