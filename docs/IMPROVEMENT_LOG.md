@@ -2,6 +2,34 @@
 
 Dated entries, newest first. Each phase of the production-readiness pass appends here.
 
+## 2026-09-13 — Phase 7: Final verification & push
+
+**Verified**
+- Full suite: `python app/tests/test_pipeline.py` -> **18/18**. Benchmarks: born-digital
+  micro-F1 **0.9948** (row recall 38/38, balance catch 2/2); OCR word-box **0.9140** vs
+  text-only 0.5419.
+- Source app (the `run.cmd` path, `python server.py`) launched and served over HTTP:
+  `/api/env` -> ocr+llm available, model qwen2.5:3b; posting `samples/bank_statement.pdf` ->
+  ok, born-digital, 15 rows, 1 balance flag, and **all three downloads (csv+xlsx+docx)** returned.
+- Installer fully rebuilt: `installer/build_installer.ps1` -> PyInstaller freeze + Inno Setup ->
+  `installer/Output/LedgerOCR-Setup.exe` (~36.8 MB, unsigned, git-ignored). Confirmed the fresh
+  `_internal/` bundles `docx`, `requests`, `certifi` (Phase 5/6 features work when frozen).
+- Frozen `LedgerOCR.exe` smoke test: `/api/env` healthy and posting the sample produced
+  csv+xlsx+docx from the packaged build.
+- `git status` clean of artifacts (no `.exe`/`__pycache__`/`.pyc` tracked; both Setup.exe paths
+  ignored; binaries protected by `.gitattributes`).
+
+**Pushed**
+- Remote `origin` = https://github.com/ZuWhNomad/ledger-ocr.git. Fast-forward push of `main`
+  (bb0a344..b6a529a, 9 commits). This Phase 7 entry is the final commit on top.
+
+**Still needs a manual clean-VM test (cannot be simulated on this dev machine)**
+- A true clean Windows box (no Python/Tesseract/Ollama/winget) install of `LedgerOCR-Setup.exe`,
+  a genuine non-admin (cannot-elevate) account, and a full silent install -> uninstall cycle
+  verifying the Tesseract/model/Ollama removal prompts and that no files/registry keys are orphaned.
+- The installer is UNSIGNED (no cert configured), so SmartScreen will warn until it is signed
+  (see docs/SIGNING.txt; build_installer.ps1 signs automatically when a cert env is set).
+
 ## 2026-09-13 — Phase 6: Local model sweep, suggestion & user selection
 
 **Empirical validation (measured this machine, my own probe)**
