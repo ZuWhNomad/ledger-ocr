@@ -2,6 +2,22 @@
 
 Dated entries, newest first. Each phase of the production-readiness pass appends here.
 
+## 2026-09-13 — Phase 3: Plain-language README & Getting Started
+
+**Changed**
+- Rewrote `README.txt` (52 lines) and `GETTING_STARTED.txt` (58 lines) for non-technical
+  accountants: what it does, one install path (run `LedgerOCR-Setup.exe`), how to process a
+  document, where output lands (Downloads), scans/photos add-on, the optional error-checker,
+  and the privacy/offline guarantee. Removed the old developer-oriented content.
+
+**Verified**
+- No jargon: `born-digital`, `localhost`, `pipeline`, `deterministic`, standalone `LLM` all
+  absent (grep clean). No line exceeds 80 columns. Plain-text formatting (ALL-CAPS headings,
+  `-` bullets).
+- Facts checked against the actual app behavior (drop zone, Download CSV/XLSX buttons, in-app
+  "Install OCR add-on", `OCR_LLM_MODEL` override). Model-selection wording will be revisited in
+  Phase 6 when the in-app model picker lands.
+
 ## 2026-09-13 — Phase 2: Installer & uninstaller robustness
 
 **Changed**
