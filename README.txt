@@ -80,7 +80,7 @@ Ollama is down or slow, the pipeline simply skips this step.
  RUN THE APP
 --------------------------------------------------------------------
 
-    powershell -ExecutionPolicy Bypass -File run.ps1
+    run.cmd  (double-click it)
     (or:  python app\server.py --port 8765 --open )
 
 Then open http://127.0.0.1:8765 , drag a PDF/image onto the drop zone,

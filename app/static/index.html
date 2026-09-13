@@ -66,6 +66,7 @@
         <option value="lines">lines</option>
       </select></span>
     <span id="envOcr" class="badge off">OCR: ?</span>
+    <button id="installOcr" hidden style="font-size:11px;padding:2px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;">Install OCR add-on</button>
     <span id="envLlm" class="badge off">LLM: ?</span>
   </div>
 
@@ -97,10 +98,22 @@ fetch('/api/env').then(r=>r.json()).then(e=>{
   if(!e.ocr_available){
     $('#subline').textContent='Runs entirely on your machine. No cloud. Born-digital PDFs (exported from your bank or accounting software).';
     $('#dropTitle').textContent='Drop a PDF here';
-    $('#dropHint').innerHTML='or click to choose a file<div class="note">Scanned/photographed statements need the free OCR add-on — see the Getting Started guide.</div>';
+    $('#dropHint').innerHTML='or click to choose a file<div class="note">Scanned/photographed statements need the free OCR add-on — click "Install OCR add-on" above.</div>';
     fileEl.setAttribute('accept','.pdf');
+    $('#installOcr').hidden = false;   // one-click install button
   }
 }).catch(()=>{});
+
+// One-click OCR install (runs winget/Tesseract on the machine; may show a Windows security prompt).
+$('#installOcr').onclick = async () => {
+  const b = $('#installOcr');
+  b.disabled = true; b.textContent = 'Installing OCR… (a minute or two; approve the security prompt if it appears)';
+  try {
+    const r = await fetch('/api/install-ocr', { method:'POST' }).then(r=>r.json());
+    if (r.ok) { b.textContent = 'OCR installed ✓'; setTimeout(()=>location.reload(), 900); }
+    else { b.disabled = false; b.textContent = 'Install OCR add-on'; alert(r.message || 'Could not install the OCR engine.'); }
+  } catch (err) { b.disabled = false; b.textContent = 'Install OCR add-on'; alert('Install failed: ' + err); }
+};
 
 drop.onclick = ()=> fileEl.click();
 fileEl.onchange = ()=> handleFiles(fileEl.files);

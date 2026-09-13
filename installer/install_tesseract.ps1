@@ -64,6 +64,21 @@ Write-Host "=== LedgerOCR OCR-engine (Tesseract) setup ===" -ForegroundColor Cya
 
 if (Have-Tesseract) { Write-Host "Tesseract already installed." -ForegroundColor Green; exit 0 }
 
+# Preferred path: winget (resolves the current version, verifies the package, installs to the standard path).
+$winget = Get-Command winget -ErrorAction SilentlyContinue
+if ($winget) {
+  Write-Host "Installing the OCR engine via winget..."
+  try {
+    & $winget.Source install --id UB-Mannheim.TesseractOCR -e --silent --accept-package-agreements --accept-source-agreements
+  } catch { Write-Host "winget install did not complete: $_" -ForegroundColor Yellow }
+  if (Have-Tesseract) {
+    try { New-Item -ItemType File -Path $InstalledByUsMarker -Force | Out-Null } catch {}
+    Write-Host "OCR engine installed - scans and photos will now work." -ForegroundColor Green
+    exit 0
+  }
+  Write-Host "winget path did not install Tesseract; falling back to a direct download." -ForegroundColor Yellow
+}
+
 Write-Host "Downloading the OCR engine (about 50 MB)..."
 $setup = "$env:TEMP\tesseract-ledgerocr-setup.exe"
 try {

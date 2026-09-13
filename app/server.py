@@ -61,6 +61,43 @@ def _friendly_error(e: Exception) -> str:
     return f"Sorry, this file could not be processed ({name}). {safe}".strip()
 
 
+def _install_ocr():
+    """Install the Tesseract OCR engine on demand (the in-app 'Install OCR' button).
+
+    Prefers winget (reliable, installs to the path the app detects); falls back to the bundled
+    install_tesseract.ps1 next to the app. Blocking (a minute or two) and may raise a UAC prompt.
+    Returns {ok, message}; ok is judged by re-detecting Tesseract afterwards.
+    """
+    import subprocess
+    from shutil import which
+    if EX.ocr_available():
+        return {"ok": True, "message": "The OCR engine is already installed."}
+    tried = []
+    winget = which("winget")
+    if winget:
+        try:
+            subprocess.run([winget, "install", "--id", "UB-Mannheim.TesseractOCR", "-e", "--silent",
+                            "--accept-package-agreements", "--accept-source-agreements"],
+                           capture_output=True, text=True, timeout=600)
+        except Exception as e:
+            tried.append(f"winget: {type(e).__name__}")
+    # Fallback: a bundled installer script (present in the packaged app / installer folder).
+    if not EX.ocr_available():
+        for cand in (os.path.join(_base_dir(), "install_tesseract.ps1"),
+                     os.path.join(os.path.dirname(_base_dir()), "install_tesseract.ps1")):
+            if os.path.exists(cand):
+                try:
+                    subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-NoProfile", "-File", cand],
+                                   capture_output=True, text=True, timeout=600)
+                except Exception as e:
+                    tried.append(f"script: {type(e).__name__}")
+                break
+    if EX.ocr_available():
+        return {"ok": True, "message": "OCR engine installed. Scans and photos will now work."}
+    hint = "winget was not available." if not winget else "the install did not complete (it may have been cancelled at the security prompt)."
+    return {"ok": False, "message": f"Could not install the OCR engine automatically — {hint} See the Getting Started guide to install it by hand."}
+
+
 class Handler(BaseHTTPRequestHandler):
     # Set by serve(): the exact Host header values accepted, or None to disable the
     # check (only when the operator opted into LAN binding via --allow-lan).
@@ -107,6 +144,9 @@ class Handler(BaseHTTPRequestHandler):
         if not self._host_ok():
             return self._send(403, json.dumps({"error": "forbidden host"}))
         parsed = urlparse(self.path)
+        if parsed.path == "/api/install-ocr":
+            res = _install_ocr()
+            return self._send(200, json.dumps(res))
         if parsed.path != "/api/process":
             return self._send(404, json.dumps({"error": "not found"}))
         q = parse_qs(parsed.query)
