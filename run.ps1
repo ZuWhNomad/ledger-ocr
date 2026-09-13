@@ -4,4 +4,4 @@ $ErrorActionPreference = "Stop"
 $py = "C:\Users\m.DESKTOP-T2DPGBS.000\AppData\Local\Programs\Python\Python312\python.exe"
 if (-not (Test-Path $py)) { $py = "python" }
 Set-Location $PSScriptRoot
-& $py server.py --port 8765 --open
+& $py app\server.py --port 8765 --open
