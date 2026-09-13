@@ -2,6 +2,41 @@
 
 Dated entries, newest first. Each phase of the production-readiness pass appends here.
 
+## 2026-09-13 — Phase 6: Local model sweep, suggestion & user selection
+
+**Empirical validation (measured this machine, my own probe)**
+- All fitting installed models emit valid classification JSON with `format=json`+`think=false`:
+  qwen2.5:3b (1.9 GB, ~3.6 s), n2ft (8.1 GB, ~9 s), qwen3.8 (17.7 GB, ~35 s). qwen3.6 (~24 GB)
+  does not fit ~16 GB free RAM; nomic-embed is an embedding model. **qwen2.5:3b remains the best
+  default** (lowest cold-start, largest RAM headroom, valid JSON). Note: n2ft now complies with
+  the schema (the old PLAN note that it ignored the schema no longer holds with format=json).
+
+**Added (validate.py)**
+- `list_installed` (excludes embedding models), `_ram_gb` (Windows ctypes / Linux /proc/meminfo),
+  `probe_model` (one canned classification, checks JSON schema), pure `suggest_from`, and `sweep`
+  (RAM fit + probe + suggestion). All network calls never raise -> LLM stays optional.
+- Persisted user choice: `get_model()` precedence **OCR_LLM_MODEL env > config.json > default**;
+  `set_model()` writes `%LOCALAPPDATA%/LedgerOCR/config.json` (test-injectable via LEDGEROCR_CONFIG).
+- `check_row`/`validate_flagged` now resolve `model or get_model()`.
+
+**Wired**
+- server.py: `GET /api/models` (10-min cached sweep, `?refresh=1`), `POST /api/model` (validates
+  the name is installed, persists), `/api/process` passes the chosen model, `/api/env` reports it.
+- index.html: a "Choose model" button runs the sweep and shows a dropdown (each model labelled with
+  size, "too large for RAM", and "suggested"); selecting one persists it and updates the badge.
+- pipeline.process: `llm_model` defaults to None so EVERY entry point resolves via get_model()
+  (the OCR_LLM_MODEL override now holds for direct callers too, not just the server).
+
+**Verified (ran myself)**
+- `python app/tests/test_pipeline.py` -> 18/18 (3 new: env>config precedence, set/get round-trip,
+  suggest_from ranking). Live `sweep()` on this machine returns suggested `qwen2.5:3b`, qwen3.6
+  `fits_ram:false`, nomic-embed excluded, qwen3.8 `json_ok:false` (slower than the 30 s probe).
+  Confirmed `sweep()` returns `available:false` (no raise) when Ollama is unreachable.
+
+**Docs**
+- Updated README.txt / GETTING_STARTED.txt for the new Excel/Word inputs, DOCX output, and the
+  in-app "Choose model" picker (folds in the Phase 5 documentation that was deferred here).
+
 ## 2026-09-13 — Phase 5: Accept .xlsx/.docx inputs + add DOCX output
 
 **Inputs**

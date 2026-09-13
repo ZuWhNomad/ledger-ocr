@@ -64,7 +64,7 @@ def _ocr_extract(path: str):
 
 
 def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
-            use_llm: bool = False, llm_model: str = VAL.DEFAULT_MODEL,
+            use_llm: bool = False, llm_model: Optional[str] = None,
             basename: Optional[str] = None) -> Dict:
     """Run the full pipeline on one file. Returns a result dict with rows, summary, outputs."""
     if strategy not in ("words", "lines"):

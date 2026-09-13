@@ -2,9 +2,10 @@
 LEDGER OCR - GETTING STARTED GUIDE
 ================================================================================
 
-Ledger OCR converts bank-statement and general-ledger PDFs, scans, and photos
-into clean spreadsheets (CSV and Excel .xlsx) entirely on your local computer.
-Your financial data is never uploaded to the internet or cloud.
+Ledger OCR turns bank statements and general ledgers into clean tables. It reads
+PDFs, scans, photos, and Excel and Word files, and saves the result as CSV,
+Excel (.xlsx), or Word (.docx) - entirely on your local computer. Your financial
+data is never uploaded to the internet or cloud.
 
 
 1. INSTALLATION
@@ -19,19 +20,19 @@ Your financial data is never uploaded to the internet or cloud.
 
 
 3. PROCESSING A DOCUMENT
-- Drag your PDF or image file directly onto the drop area, or click to choose
-  a file from your computer.
+- Drag your PDF, image, Excel, or Word file directly onto the drop area, or
+  click to choose a file from your computer.
 - Wait a few seconds while the document is processed.
 - A table preview of your transactions will appear on screen.
 - Rows that the tool detects may contain a math error are highlighted for
   your review.
 
 
-4. DOWNLOADING SPREADSHEETS
-- Click "Download CSV" or "Download XLSX".
-- The spreadsheet file will be saved directly to your Downloads folder.
-- You can open and edit the file immediately in Microsoft Excel or Google
-  Sheets.
+4. DOWNLOADING YOUR TABLE
+- Click "Download CSV", "Download XLSX" (Excel), or "Download DOCX" (Word).
+- The file will be saved directly to your Downloads folder.
+- You can open and edit it immediately in Microsoft Excel, Google Sheets, or
+  Microsoft Word. Flagged rows are highlighted in the Excel and Word files.
 
 
 5. SCANNED DOCUMENTS AND PHOTOS
@@ -47,12 +48,16 @@ Your financial data is never uploaded to the internet or cloud.
   math verification.
 - The assistant runs 100% on your machine and never modifies your numbers.
 - It remains completely off unless installed and turned on.
-- (Advanced, safe to ignore: power users can configure the assistant model
-  via the OCR_LLM_MODEL setting.)
+- Choosing the assistant: the app checks which local assistants are installed
+  and suggests the best one for your computer. To use a different one, click
+  "Choose model" and pick from the list - your choice is remembered.
+- (Advanced, safe to ignore: power users can also set the model with the
+  OCR_LLM_MODEL setting.)
 
 
 7. TROUBLESHOOTING TIPS
 - Browser did not open: Double-click run.cmd or open "Ledger OCR" from Start.
 - Scans not reading: Click "Install OCR add-on" in the app and accept prompts.
-- Cannot find files: Look for downloaded CSV/XLSX in your Downloads folder.
+- Cannot find files: Look for the downloaded CSV, Excel, or Word file in your
+  Downloads folder.
 - Highlighted rows: Check flagged rows in the preview for potential math errors.

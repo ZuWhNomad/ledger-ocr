@@ -17,6 +17,7 @@ import os
 import re
 import tempfile
 import webbrowser
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -25,6 +26,10 @@ import sys
 from ocr_pipeline.pipeline import process
 from ocr_pipeline import extract as EX
 from ocr_pipeline import validate as VAL
+
+_models_cache = None
+_models_cache_time = 0.0
+SWEEP_TTL_SEC = 600.0
 
 
 def _base_dir():
@@ -136,8 +141,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps({
                 "ocr_available": EX.ocr_available(),
                 "llm_available": VAL.available(),
-                "llm_model": VAL.DEFAULT_MODEL,
+                "llm_model": VAL.get_model(),
             }))
+        if path == "/api/models":
+            q = parse_qs(urlparse(self.path).query)
+            refresh = q.get("refresh", ["0"])[0] in ("1", "true", "yes")
+            global _models_cache, _models_cache_time
+            now = time.time()
+            if refresh or _models_cache is None or (now - _models_cache_time) > SWEEP_TTL_SEC:
+                _models_cache = VAL.sweep()
+                _models_cache_time = now
+            return self._send(200, json.dumps(_models_cache))
         return self._send(404, json.dumps({"error": "not found"}))
 
     def do_POST(self):
@@ -147,11 +161,33 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/install-ocr":
             res = _install_ocr()
             return self._send(200, json.dumps(res))
+        if parsed.path == "/api/model":
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0 or length > 64 * 1024:
+                return self._send(400, json.dumps({"ok": False, "error": "invalid request size"}))
+            raw = self.rfile.read(length)
+            try:
+                body = json.loads(raw.decode("utf-8"))
+                name = body.get("model") if isinstance(body, dict) else None
+                if not name or not isinstance(name, str):
+                    return self._send(400, json.dumps({"ok": False, "error": "missing model parameter"}))
+                installed_models = [m["name"] for m in VAL.list_installed()]
+                if name not in installed_models:
+                    return self._send(400, json.dumps({"ok": False, "error": f"model '{name}' is not installed"}))
+                VAL.set_model(name)
+                global _models_cache
+                if _models_cache is not None:
+                    _models_cache["current"] = name
+                return self._send(200, json.dumps({"ok": True, "model": name}))
+            except Exception as e:
+                return self._send(400, json.dumps({"ok": False, "error": f"invalid JSON: {e}"}))
         if parsed.path != "/api/process":
             return self._send(404, json.dumps({"error": "not found"}))
         q = parse_qs(parsed.query)
         strategy = (q.get("strategy", ["words"])[0])
         use_llm = q.get("llm", ["0"])[0] in ("1", "true", "yes")
+        model_param = q.get("model", [None])[0]
+        llm_model = model_param if model_param else VAL.get_model()
         filename = self.headers.get("X-Filename", "upload.pdf")
         ext = os.path.splitext(filename)[1].lower()
         if ext not in ALLOWED_EXT:
@@ -165,7 +201,7 @@ class Handler(BaseHTTPRequestHandler):
                 src = os.path.join(td, "input" + ext)
                 with open(src, "wb") as f:
                     f.write(raw)
-                out = process(src, outdir=td, strategy=strategy, use_llm=use_llm, basename="result")
+                out = process(src, outdir=td, strategy=strategy, use_llm=use_llm, llm_model=llm_model, basename="result")
                 if not out.get("ok"):
                     return self._send(200, json.dumps(out))
                 resp = {
