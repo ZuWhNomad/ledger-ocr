@@ -1,0 +1,22 @@
+# Default: let git handle text line endings, but NEVER touch binary assets
+# (EOL conversion corrupts them). autocrlf is on for this repo, so be explicit.
+* text=auto
+
+*.pdf   binary
+*.xlsx  binary
+*.xls   binary
+*.docx  binary
+*.exe   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.tif   binary
+*.tiff  binary
+*.bmp   binary
+*.gif   binary
+*.ico   binary
+
+# Windows scripts are CRLF
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
