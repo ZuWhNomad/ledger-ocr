@@ -11,7 +11,20 @@ the design choices.
 - **Optional local LLM error-check.** A local Ollama model classifies *flagged* rows only. It
   never creates or edits numbers, and the pipeline works fully without it.
 
-## Install
+## For non-technical users (packaged installer)
+
+No Python, no terminal. See [`GETTING_STARTED.md`](GETTING_STARTED.md). Either double-click
+**`LedgerOCR-Setup.exe`**, or, with the fallback folder, double-click **`INSTALL.bat`**. It sets
+everything up (bundled runtime, shortcuts, optional error-check model) and opens the app.
+
+To build that installer from source (needs `pip install pyinstaller` and Inno Setup 6):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File installer\build_installer.ps1
+# -> installer\Output\LedgerOCR-Setup.exe   (and installer\dist\LedgerOCR\ for the INSTALL.bat fallback)
+```
+
+## Run from source (developers)
 
 Requires Python 3.12+ (Node not needed).
 
