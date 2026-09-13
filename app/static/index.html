@@ -55,7 +55,7 @@
   <div id="drop">
     <h2 id="dropTitle">Drop a PDF or image here</h2>
     <p id="dropHint">or click to choose a file</p>
-    <input type="file" id="file" hidden accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.xlsx,.xlsm,.docx">
+    <input type="file" id="file" hidden accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.webp,.heic,.heif,.xlsx,.xlsm,.docx">
   </div>
 
   <div class="opts">
@@ -114,7 +114,8 @@ chooseBtn.onclick = async () => {
   try {
     const sweep = await fetch('/api/models').then(r => r.json());
     if (!sweep.available || !sweep.models || !sweep.models.length) {
-      chooseBtn.textContent = 'no local models detected';
+      chooseBtn.disabled = false;
+      chooseBtn.textContent = 'No local models found — click to retry';
       return;
     }
     modelSelect.innerHTML = '';
@@ -200,8 +201,20 @@ async function upload(file, extraNote){
       headers:{'X-Filename':file.name}, body:file });
     const d = await r.json();
     if(!d.ok){ $('#status').innerHTML = '<span class="err">'+ escapeHtml(d.error||'failed') +'</span>'; return; }
+    if(d.document_shape === 'unrecognized'){ renderUnrecognized(d); return; }
     render(d, llmOn);
   }catch(err){ $('#status').innerHTML = '<span class="err">'+escapeHtml(String(err))+'</span>'; }
+}
+
+// A file with no bank-statement/ledger table (e.g. a receipt): show the plain-English
+// explanation and offer the raw recognized text -- never a header-only "ledger" CSV.
+function renderUnrecognized(d){
+  $('#status').innerHTML = 'Done &mdash; no bank-statement/ledger table found';
+  const base=(d.filename||'result').replace(/\.[^.]+$/,'');
+  $('#summary').innerHTML = '<div class="chip" style="max-width:100%;white-space:normal;line-height:1.5;">'
+    + escapeHtml(d.message||'') + '</div>';
+  $('#result').innerHTML = '';
+  if(d.text_b64) $('#dl').appendChild(dlBtn('Download recognized text (.txt)', d.text_b64, 'text/plain', base+'.txt'));
 }
 
 function render(d, llmRequested){
