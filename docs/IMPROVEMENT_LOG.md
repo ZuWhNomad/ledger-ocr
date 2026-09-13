@@ -2,6 +2,41 @@
 
 Dated entries, newest first. Each phase of the production-readiness pass appends here.
 
+## 2026-09-13 — Phase 5: Accept .xlsx/.docx inputs + add DOCX output
+
+**Inputs**
+- `extract.STRUCTURED_EXTS = {.xlsx,.xlsm,.docx}` + `extract_structured(path)`: reads office
+  ledgers and maps columns via the SAME `tables._table_to_records` used for PDF tables (xlsx via
+  openpyxl read-only; docx tables via python-docx). xlsx date cells are formatted `%Y-%m-%d` and
+  whole-number floats lose the trailing `.0` so parse_money stays exact.
+- `pipeline.process` branches on extension BEFORE the PDF/scan logic (office files must not be
+  opened as PDFs); route `structured`, strategy `table-xlsx` / `table-docx`. A missing python-docx
+  on a .docx upload returns a clear message (not a crash).
+- `server.ALLOWED_EXT` + the UI file `accept` (both branches) now include .xlsx/.xlsm/.docx.
+
+**Output**
+- `export.to_docx(rows, path)`: a clean "Transactions" table document (Table Grid, bold headers).
+  Flagged rows are visibly marked — every cell shaded `F4CCCC` (matching the XLSX highlight) and
+  the flag text in red. Wired into `pipeline` (guarded like xlsx: `docx_error` on failure so
+  CSV/XLSX are still delivered), the server (`docx_b64`, correct MIME), and the UI (Download DOCX
+  button next to CSV/XLSX).
+
+**Dependency**
+- `python-docx` added as OPTIONAL: requirements (`>=1.1`), constraints (`python-docx==1.2.0`,
+  `lxml==6.0.2`), and the PyInstaller spec (`docx` in collect_all). The pdfplumber+openpyxl-only
+  invariant still holds — python-docx is optional for both .docx input and .docx output.
+
+**Verified (ran myself)**
+- `python app/tests/test_pipeline.py` -> 15/15 (3 new: xlsx input end-to-end flags an injected
+  error and reports route=structured; docx input round-trips a table; docx export opens and has
+  the table). `python app/tests/bench.py` unchanged (0.9948). Reviewed to_docx, server, and UI
+  diffs directly.
+
+**Deferred**
+- The README/Getting Started mention of Excel/Word input + DOCX output is folded into the Phase 6
+  documentation pass (which also revises the model-selection section) to avoid editing the same
+  lines twice.
+
 ## 2026-09-13 — Phase 4B: OCR engine comparison + adopt the word-box path
 
 **Research (quantified in docs/BENCHMARK.md, "OCR engine comparison")**

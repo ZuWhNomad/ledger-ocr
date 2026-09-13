@@ -72,25 +72,36 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
         # the user's (possibly typo'd) string as if it had been honored.
         return {"ok": False, "error": f"unknown strategy '{strategy}' (expected 'words' or 'lines')"}
     path = os.path.abspath(path)
-    scanned = EX.looks_scanned(path)
-    route = "ocr" if scanned else "born-digital"
-
+    ext = os.path.splitext(path)[1].lower()
     ocr_method: Optional[str] = None
-    if scanned:
-        if not EX.ocr_available():
-            return {"ok": False, "route": route,
-                    "error": "This looks like a scan or photo, which needs the free OCR add-on "
-                             "to read. Born-digital PDFs (exported from your bank or accounting "
-                             "software) work without it. To read scans and photos, install the OCR "
-                             "add-on — see \"Reading scans and photos\" in the Getting Started guide."}
-        raw, ocr_method = _ocr_extract(path)
+    if ext in EX.STRUCTURED_EXTS:
+        try:
+            raw = EX.extract_structured(path)
+        except ImportError:
+            return {"ok": False, "error": "Reading Word (.docx) files needs the free "
+                    "python-docx add-on. Save the ledger as .xlsx or CSV, or install the "
+                    "add-on (see the Getting Started guide)."}
+        route = "structured"
+        ocr_method = "table-" + ext.lstrip(".")
     else:
-        raw = EX.extract_tables_born_digital(path, strategy=strategy)
-        # Safety net: a text layer that yields no table rows (e.g. an image table on
-        # an otherwise-digital page) falls back to OCR when it is available.
-        if not raw and EX.ocr_available():
-            route = "born-digital->ocr-fallback"
+        scanned = EX.looks_scanned(path)
+        route = "ocr" if scanned else "born-digital"
+
+        if scanned:
+            if not EX.ocr_available():
+                return {"ok": False, "route": route,
+                        "error": "This looks like a scan or photo, which needs the free OCR add-on "
+                                 "to read. Born-digital PDFs (exported from your bank or accounting "
+                                 "software) work without it. To read scans and photos, install the OCR "
+                                 "add-on — see \"Reading scans and photos\" in the Getting Started guide."}
             raw, ocr_method = _ocr_extract(path)
+        else:
+            raw = EX.extract_tables_born_digital(path, strategy=strategy)
+            # Safety net: a text layer that yields no table rows (e.g. an image table on
+            # an otherwise-digital page) falls back to OCR when it is available.
+            if not raw and EX.ocr_available():
+                route = "born-digital->ocr-fallback"
+                raw, ocr_method = _ocr_extract(path)
 
     rows = RC.normalize_rows(raw)
     rows, summary = RC.reconcile(rows)
@@ -111,5 +122,9 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
             outputs["xlsx"] = XP.to_xlsx(rows, os.path.join(outdir, stem + ".xlsx"))
         except Exception as e:  # openpyxl missing -> CSV still delivered
             outputs["xlsx_error"] = str(e)
+        try:
+            outputs["docx"] = XP.to_docx(rows, os.path.join(outdir, stem + ".docx"))
+        except Exception as e:  # python-docx missing -> CSV/XLSX still delivered
+            outputs["docx_error"] = str(e)
 
     return {"ok": True, "route": route, "summary": summary, "rows": rows, "outputs": outputs}

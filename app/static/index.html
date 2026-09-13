@@ -55,7 +55,7 @@
   <div id="drop">
     <h2 id="dropTitle">Drop a PDF or image here</h2>
     <p id="dropHint">or click to choose a file</p>
-    <input type="file" id="file" hidden accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif">
+    <input type="file" id="file" hidden accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.xlsx,.xlsm,.docx">
   </div>
 
   <div class="opts">
@@ -99,7 +99,7 @@ fetch('/api/env').then(r=>r.json()).then(e=>{
     $('#subline').textContent='Runs entirely on your machine. No cloud. Born-digital PDFs (exported from your bank or accounting software).';
     $('#dropTitle').textContent='Drop a PDF here';
     $('#dropHint').innerHTML='or click to choose a file<div class="note">Scanned/photographed statements need the free OCR add-on — click "Install OCR add-on" above.</div>';
-    fileEl.setAttribute('accept','.pdf');
+    fileEl.setAttribute('accept','.pdf,.xlsx,.xlsm,.docx');
     $('#installOcr').hidden = false;   // one-click install button
   }
 }).catch(()=>{});
@@ -183,6 +183,8 @@ function render(d, llmRequested){
   if(d.csv_b64) $('#dl').appendChild(dlBtn('Download CSV', d.csv_b64,'text/csv', base+'.csv'));
   if(d.xlsx_b64) $('#dl').appendChild(dlBtn('Download XLSX', d.xlsx_b64,
      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', base+'.xlsx'));
+  if(d.docx_b64) $('#dl').appendChild(dlBtn('Download DOCX', d.docx_b64,
+     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', base+'.docx'));
 
   const cols=['date','description','debit','credit','amount','balance'];
   let t='<div class="tablewrap"><table><thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'<th>notes</th></tr></thead><tbody>';

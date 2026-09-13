@@ -16,7 +16,7 @@ hiddenimports = ["ocr_pipeline"]
 # and the model sweep: it is imported lazily and swallowed on ImportError, so without it the
 # FROZEN app would silently report the LLM as unavailable even when Ollama is running.
 for pkg in ("pdfplumber", "pypdfium2", "pypdfium2_raw", "pdfminer", "openpyxl", "pytesseract",
-            "PIL", "requests", "certifi", "urllib3", "charset_normalizer", "idna"):
+            "PIL", "requests", "certifi", "urllib3", "charset_normalizer", "idna", "docx"):
     try:
         d, b, h = collect_all(pkg)
         datas += d

@@ -35,7 +35,7 @@ def _base_dir():
 HERE = _base_dir()
 INDEX = os.path.join(HERE, "static", "index.html")
 MAX_BYTES = 40 * 1024 * 1024
-ALLOWED_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif"}
+ALLOWED_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".xlsx", ".xlsm", ".docx"}
 
 # Strips absolute Windows/Unix paths out of any text before it reaches the client
 # (SEC-P3-5): keep error messages plain-English, never echo local filesystem paths.
@@ -175,8 +175,9 @@ class Handler(BaseHTTPRequestHandler):
                     "summary": out["summary"],
                     "rows": [_slim(r) for r in out["rows"]],
                 }
-                for kind, mime in (("csv", "text/csv"), ("xlsx",
-                                   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")):
+                for kind, mime in (("csv", "text/csv"),
+                                   ("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                                   ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")):
                     p = out["outputs"].get(kind)
                     if p and os.path.exists(p):
                         with open(p, "rb") as f:
