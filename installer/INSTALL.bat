@@ -28,7 +28,7 @@ robocopy "%SRC%" "%DEST%" /E /NFL /NDL /NJH /NJS /NP >nul
 if exist "%~dp0install_ollama.ps1" copy /y "%~dp0install_ollama.ps1" "%DEST%\" >nul
 if exist "%~dp0uninstall_cleanup.ps1" copy /y "%~dp0uninstall_cleanup.ps1" "%DEST%\" >nul
 if exist "%~dp0UNINSTALL.bat" copy /y "%~dp0UNINSTALL.bat" "%DEST%\" >nul
-if exist "%~dp0GETTING_STARTED.md" copy /y "%~dp0GETTING_STARTED.md" "%DEST%\" >nul
+if exist "%~dp0GETTING_STARTED.txt" copy /y "%~dp0GETTING_STARTED.txt" "%DEST%\" >nul
 
 echo Creating shortcuts...
 powershell -NoProfile -Command "$w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut((Join-Path([Environment]::GetFolderPath('Desktop')) 'LedgerOCR.lnk')); $s.TargetPath='%DEST%\LedgerOCR.exe'; $s.WorkingDirectory='%DEST%'; $s.Save()"

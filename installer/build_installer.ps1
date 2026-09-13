@@ -21,7 +21,7 @@
     Optional: $env:CODESIGN_TS = timestamp URL (default http://timestamp.digicert.com).
     When set, both the frozen exe and the Setup.exe are signed with an RFC3161
     timestamp (/tr), SHA-256 file digest (/fd) and SHA-256 timestamp digest (/td).
-    When unset, the build proceeds UNSIGNED and prints a note. See SIGNING.md.
+    When unset, the build proceeds UNSIGNED and prints a note. See SIGNING.txt.
 #>
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
@@ -65,7 +65,7 @@ if ($env:CODESIGN_THUMBPRINT -or ($env:CODESIGN_PFX -and $env:CODESIGN_PASS)) {
   }
 } else {
   Write-Host "No code-signing cert configured (set CODESIGN_THUMBPRINT or CODESIGN_PFX + CODESIGN_PASS)." -ForegroundColor Yellow
-  Write-Host "Building UNSIGNED -- users will see a SmartScreen prompt. See SIGNING.md and GETTING_STARTED.md." -ForegroundColor Yellow
+  Write-Host "Building UNSIGNED -- users will see a SmartScreen prompt. See SIGNING.txt and GETTING_STARTED.txt." -ForegroundColor Yellow
 }
 
 function Sign-File([string]$path) {
@@ -103,7 +103,7 @@ if ($iscc) {
   if ($LASTEXITCODE -ne 0) { throw "ISCC compile failed" }
   Write-Host "Done: installer\Output\LedgerOCR-Setup.exe" -ForegroundColor Green
   if (-not $signConfigured) {
-    Write-Host "(unsigned build -- see GETTING_STARTED.md 'If Windows shows a blue warning')" -ForegroundColor Yellow
+    Write-Host "(unsigned build -- see GETTING_STARTED.txt 'If Windows shows a blue warning')" -ForegroundColor Yellow
   }
 } else {
   Write-Host "Inno Setup not found. Ship the folder installer\dist\LedgerOCR alongside" -ForegroundColor Yellow
