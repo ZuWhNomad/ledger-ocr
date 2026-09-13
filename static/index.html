@@ -112,7 +112,11 @@ function render(d){
     ['convention', s.sign_convention.replace(/_/g,' ')],
   ];
   let html = chips.map(c=>`<div class="chip">${c[0]}: <b>${c[1]}</b></div>`).join('');
-  html += `<div class="chip ${s.balance_mismatches?'warn':''}">balance mismatches: <b>${s.balance_mismatches}</b></div>`;
+  if(s.balance_checked===false){
+    html += `<div class="chip">balance: <b>not checked</b></div>`;
+  } else {
+    html += `<div class="chip ${s.balance_mismatches?'warn':''}">balance mismatches: <b>${s.balance_mismatches}</b></div>`;
+  }
   if(s.llm && s.llm.enabled) html += `<div class="chip">LLM checked: <b>${s.llm.checked}</b> (${s.llm.model})</div>`;
   $('#summary').innerHTML = html;
 

@@ -69,15 +69,30 @@ def check_row(ctx: Dict, model: str = DEFAULT_MODEL, url: str = DEFAULT_URL,
 
 
 def validate_flagged(rows: List[Dict], model: str = DEFAULT_MODEL, url: str = DEFAULT_URL,
-                     max_rows: int = 25) -> Dict:
-    """Run the LLM over flagged rows only. Annotates rows in place with 'llm'. Non-blocking."""
+                     max_rows: int = 25, max_consecutive_failures: int = 3) -> Dict:
+    """Run the LLM over flagged rows only. Annotates rows in place with 'llm'. Non-blocking.
+
+    The cap bounds ATTEMPTS, not successes: if the model keeps returning None (Ollama died
+    mid-batch, JSON won't parse, or every call hits the 120s timeout) the old code -- which
+    only counted successes toward the cap -- would try every flagged row at up to 120s each.
+    We also bail out after a run of consecutive failures so a dead model can't stall the
+    request for minutes.
+    """
     if not available(url):
         return {"enabled": False, "reason": "ollama_unavailable", "checked": 0}
-    checked = 0
+    checked = attempts = consecutive_failures = 0
     for i, r in enumerate(rows):
-        if r.get("flag") and checked < max_rows:
-            res = check_row(_row_view(rows, i), model=model, url=url)
-            if res is not None:
-                r["llm"] = res
-                checked += 1
-    return {"enabled": True, "model": model, "checked": checked}
+        if not r.get("flag"):
+            continue
+        if attempts >= max_rows or consecutive_failures >= max_consecutive_failures:
+            break
+        attempts += 1
+        res = check_row(_row_view(rows, i), model=model, url=url)
+        if res is not None:
+            r["llm"] = res
+            checked += 1
+            consecutive_failures = 0
+        else:
+            consecutive_failures += 1
+    return {"enabled": True, "model": model, "checked": checked,
+            "attempted": attempts, "failed": attempts - checked}

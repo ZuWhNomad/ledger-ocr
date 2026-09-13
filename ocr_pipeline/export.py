@@ -1,9 +1,12 @@
 """Export normalized rows to CSV (stdlib) and XLSX (openpyxl, with flags highlighted)."""
 from __future__ import annotations
 import csv
+from decimal import Decimal
 from typing import List, Dict
 
 COLUMNS = ["date", "description", "debit", "credit", "amount", "balance", "flag", "llm_classification"]
+# Money columns and the parsed-Decimal field that backs each (see reconcile.normalize_rows).
+_MONEY_FIELD = {"debit": "_debit", "credit": "_credit", "amount": "_amount", "balance": "_balance"}
 
 
 def _flat(rows: List[Dict]) -> List[Dict]:
@@ -31,9 +34,22 @@ def to_csv(rows: List[Dict], path: str) -> str:
     return path
 
 
+def _xlsx_cell(row: Dict, col: str):
+    """Cell value for XLSX: money columns become real numbers (exact parsed Decimal, so
+    Excel can sum/filter them and no float rounding is introduced); everything else is the
+    string projection. An unparseable money cell falls back to its original text."""
+    field = _MONEY_FIELD.get(col)
+    if field is not None:
+        val = row.get(field)
+        if isinstance(val, Decimal):
+            return val  # openpyxl writes Decimal as a numeric cell, value-exact
+    return None  # signal: use the flat string
+
+
 def to_xlsx(rows: List[Dict], path: str) -> str:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
     wb = Workbook()
     ws = wb.active
     ws.title = "Transactions"
@@ -41,13 +57,18 @@ def to_xlsx(rows: List[Dict], path: str) -> str:
     for c in ws[1]:
         c.font = Font(bold=True)
     warn = PatternFill(start_color="FFF4CCCC", end_color="FFF4CCCC", fill_type="solid")
-    for rec in _flat(rows):
-        ws.append([rec[c] for c in COLUMNS])
-        if rec["flag"]:
+    flat = _flat(rows)
+    for row, frec in zip(rows, flat):
+        values = []
+        for col in COLUMNS:
+            num = _xlsx_cell(row, col)
+            values.append(num if num is not None else frec[col])
+        ws.append(values)
+        if frec["flag"]:
             for c in ws[ws.max_row]:
                 c.fill = warn
     for i, col in enumerate(COLUMNS, 1):
-        width = max(len(col), *(len(str(r[col])) for r in _flat(rows))) if rows else len(col)
-        ws.column_dimensions[chr(64 + i)].width = min(max(width + 2, 8), 60)
+        width = max(len(col), *(len(str(r[col])) for r in flat)) if flat else len(col)
+        ws.column_dimensions[get_column_letter(i)].width = min(max(width + 2, 8), 60)
     wb.save(path)
     return path

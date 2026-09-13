@@ -80,7 +80,7 @@ machine-checked position won.
 | OCR engine | **Tesseract** via **pytesseract** (optional) | the local, offline standard; only used for scans |
 | XLSX export | **openpyxl** | standard; CSV needs only the stdlib |
 | Ollama call | **requests** | one local HTTP POST; no heavy SDK |
-| Error-check LLM | **`qwen3.8:latest`** (Ollama), optional & configurable | installed here and reliably emits the required JSON schema |
+| Error-check LLM | **`qwen2.5:3b`** (Ollama) by default, optional & configurable | low cold-start / RAM headroom and reliably emits the required JSON schema (override with `OCR_LLM_MODEL`) |
 
 **Model note (this machine):** 32 GB RAM, ~18 GB free. `qwen3.8` (17.7 GB) fits but is tight;
 `qwen3.6` (23.9 GB) does **not** fit and is not used. `n2ft` (a 4 B model present here) ignored
