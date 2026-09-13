@@ -15,7 +15,14 @@ if defined LEDGEROCR_DEST set "DEST=%LEDGEROCR_DEST%"
 if not exist "%SRC%\LedgerOCR.exe" (
   echo ERROR: cannot find the app files next to this installer.
   echo Expected: "%SRC%\LedgerOCR.exe"
-  echo Make sure you unzipped the whole folder before running INSTALL.
+  echo.
+  echo This INSTALL.bat is the "folder" install option and must sit NEXT TO the built
+  echo LedgerOCR app folder (both come together in the distributed zip).
+  echo.
+  echo   * If you unzipped a release: make sure you extracted the WHOLE folder, then run
+  echo     INSTALL.bat from there ^(not from inside a sub-folder^).
+  echo   * If this is the source code repo: just run  LedgerOCR-Setup.exe  in the top
+  echo     folder instead. ^(Or build first: installer\build_installer.ps1.^)
   pause & exit /b 1
 )
 
