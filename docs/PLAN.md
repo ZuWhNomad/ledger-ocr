@@ -107,9 +107,13 @@ for a larger fixture set; documented as future work below.
 
 ## Known limitations / future work
 
-- OCR uses `image_to_string` (text only); columns are recovered by a line regex. `image_to_data`
-  (word bounding boxes) would let the same header-anchored column logic run on scans — the
-  biggest single robustness win for scanned statements.
+- ~~OCR uses `image_to_string` (text only); columns are recovered by a line regex.~~ **Done
+  (2026-09-13).** The OCR path now runs `image_to_data` (word bounding boxes) through the shared
+  `tables.build_rows_from_words`, so scans use the exact header-anchored column logic as
+  born-digital pages (recovers debit/credit, keeps descriptions out of money cells). The old
+  `image_to_string` + line-regex parser remains as an automatic fallback for pages where word-box
+  reconstruction finds nothing (e.g. heavy full-grid borders). Quantified in `docs/BENCHMARK.md`
+  (OCR engine comparison: aggregate micro-F1 ~0.91 word-box vs ~0.54 text-only on rendered scans).
 - One synthetic fixture. Grok listed 10 fixture shapes worth adding (full-grid vlines, wrapped
   descriptions, page-2 with no header, EU number formats, single signed-amount column, two tables
   on a page, hybrid scanned page). Each is a small PDF + expected CSV.

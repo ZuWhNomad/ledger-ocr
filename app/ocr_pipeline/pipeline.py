@@ -49,6 +49,20 @@ def parse_text_rows(text: str) -> List[Dict[str, str]]:
     return rows
 
 
+def _ocr_extract(path: str):
+    """OCR extraction with graceful degradation. Returns (rows, method).
+
+    Primary: the word-box path (Tesseract image_to_data) reconstructed with the shared
+    header-anchored logic, which recovers separate debit/credit columns. Fallback: the
+    plain-text line parser, used when the word-box path recovers nothing (e.g. heavy table
+    borders defeat header OCR). See docs/BENCHMARK.md (OCR engine comparison).
+    """
+    rows = EX.ocr_to_rows(path)
+    if rows:
+        return rows, "ocr-words"
+    return parse_text_rows(EX.ocr_to_text(path)), "ocr-textlines"
+
+
 def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
             use_llm: bool = False, llm_model: str = VAL.DEFAULT_MODEL,
             basename: Optional[str] = None) -> Dict:
@@ -61,6 +75,7 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
     scanned = EX.looks_scanned(path)
     route = "ocr" if scanned else "born-digital"
 
+    ocr_method: Optional[str] = None
     if scanned:
         if not EX.ocr_available():
             return {"ok": False, "route": route,
@@ -68,20 +83,19 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
                              "to read. Born-digital PDFs (exported from your bank or accounting "
                              "software) work without it. To read scans and photos, install the OCR "
                              "add-on — see \"Reading scans and photos\" in the Getting Started guide."}
-        text = EX.ocr_to_text(path)
-        raw = parse_text_rows(text)
+        raw, ocr_method = _ocr_extract(path)
     else:
         raw = EX.extract_tables_born_digital(path, strategy=strategy)
         # Safety net: a text layer that yields no table rows (e.g. an image table on
         # an otherwise-digital page) falls back to OCR when it is available.
         if not raw and EX.ocr_available():
             route = "born-digital->ocr-fallback"
-            raw = parse_text_rows(EX.ocr_to_text(path))
+            raw, ocr_method = _ocr_extract(path)
 
     rows = RC.normalize_rows(raw)
     rows, summary = RC.reconcile(rows)
     summary["route"] = route
-    summary["strategy"] = strategy if not scanned else "ocr-textlines"
+    summary["strategy"] = ocr_method or strategy
 
     llm_info = {"enabled": False}
     if use_llm and summary.get("balance_mismatches"):

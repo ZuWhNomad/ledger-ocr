@@ -16,13 +16,8 @@ from ocr_pipeline.pipeline import process
 from ocr_pipeline.reconcile import parse_money
 
 
-def evaluate_fixture(pdf_path: str, csv_path: str) -> Dict:
-    res = process(pdf_path, strategy="words")
-    pred_rows = res.get("rows", [])
-
-    with open(csv_path, "r", encoding="utf-8") as f:
-        truth_rows = list(csv.DictReader(f))
-
+def score_rows(pred_rows: List[Dict], truth_rows: List[Dict]) -> Dict:
+    """Score predicted rows against ground truth rows using greedy matching and field-level micro metrics."""
     used_pred = set()
     matches: List[Tuple[int, int]] = []
 
@@ -110,14 +105,11 @@ def evaluate_fixture(pdf_path: str, csv_path: str) -> Dict:
     balance_flag_truth_count = 0
     balance_flag_caught_count = 0
 
-    pred_map = {m[1]: truth_rows[m[0]] for m in matches}
-
     for t_idx, t_row in enumerate(truth_rows):
         t_flag = t_row.get("flag") or ""
         if "balance" in t_flag:
             balance_flag_truth_count += 1
             # Check if matched predicted row has non-empty flag
-            # Find if t_idx was matched
             for tm, pm in matches:
                 if tm == t_idx:
                     p_flag = pred_rows[pm].get("flag") or ""
@@ -125,15 +117,27 @@ def evaluate_fixture(pdf_path: str, csv_path: str) -> Dict:
                         balance_flag_caught_count += 1
 
     return {
-        "truth_rows_count": len(truth_rows),
-        "pred_rows_count": len(pred_rows),
-        "matched_rows_count": len(matches),
         "tp": tp,
         "fp": fp,
         "fn": fn,
+        "matched": len(matches),
+        "truth": len(truth_rows),
+        "truth_rows_count": len(truth_rows),
+        "pred_rows_count": len(pred_rows),
+        "matched_rows_count": len(matches),
         "balance_flag_truth_count": balance_flag_truth_count,
         "balance_flag_caught_count": balance_flag_caught_count,
     }
+
+
+def evaluate_fixture(pdf_path: str, csv_path: str) -> Dict:
+    res = process(pdf_path, strategy="words")
+    pred_rows = res.get("rows", [])
+
+    with open(csv_path, "r", encoding="utf-8") as f:
+        truth_rows = list(csv.DictReader(f))
+
+    return score_rows(pred_rows, truth_rows)
 
 
 def run_benchmark():

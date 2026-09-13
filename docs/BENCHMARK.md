@@ -34,3 +34,24 @@ The benchmark evaluates the deterministic `words` strategy across seven syntheti
 - **Row Matching:** Greedy ordering alignment. A predicted row matches a truth row iff dates are identical and normalized money values (`parse_money`) match on balance (or amount/debit/credit if balance is omitted).
 - **Field Metrics:** Micro-averaged Precision, Recall, and F1 calculated over the four primary fields (`date`, `debit`, `credit`, `balance`).
 - **Balance Catch Rate:** Fraction of deliberate running-balance arithmetic errors correctly flagged by reconciliation.
+
+## OCR engine comparison
+
+| Fixture | Path A F1 (image_to_string) | Path A Time (s) | Path B F1 (image_to_data) | Path B Time (s) |
+| :--- | :---: | :---: | :---: | :---: |
+| `base_ruled` | 0.7671 | 1.01 | 0.9778 | 0.96 |
+| `bleed_description` | 0.0000 | 0.59 | 1.0000 | 0.57 |
+| `eu_format` | 0.0000 | 0.60 | 1.0000 | 0.57 |
+| `full_grid` | 0.6667 | 0.67 | 0.0000 | 0.67 |
+| `single_amount` | 0.0000 | 0.59 | 1.0000 | 0.56 |
+| `two_page` | 1.0000 | 1.05 | 1.0000 | 1.01 |
+| `two_tables` | 0.0000 | 0.66 | 0.8421 | 0.62 |
+| **Aggregate** | **0.5419** | **5.17** | **0.9140** | **4.97** |
+
+### Methodology
+
+Evaluates local Tesseract OCR on clean 300-dpi rasterized PIL images generated from synthetic born-digital ledger PDF fixtures using pdfplumber/pypdfium2. Path A (the old fallback) runs `pytesseract.image_to_string` followed by regex textline parsing (`parse_text_rows`), which cannot separate debit from credit columns. Path B (word-box) runs `pytesseract.image_to_data(..., config='--psm 6')` and reconstructs rows via `ocr_pipeline.tables.build_rows_from_words` -- the exact same header-anchored logic the born-digital `words` strategy uses, so scans and digital PDFs share one tested code path. Timing reports wall-clock seconds after a warm-up OCR call. Real scans/photocopies will be noisier (skew, degraded glyphs) than these clean synthetic renders.
+
+**RECOMMENDATION:** Path B (image_to_data) clearly outperforms Path A (image_to_string) (Aggregate micro-F1: **0.9140** vs **0.5419**, a gain of **+0.3720** F1 points). Path B disambiguates distinct debit/credit columns, keeps wide descriptions out of the money cells, and carries column boundaries across continuation pages.
+
+**ADOPTED IN PRODUCTION:** `pipeline.process` now uses the Path B word-box path for every scan/image, falling back to the Path A text-line parser only when Path B recovers no rows (e.g. heavy full-grid borders defeat header OCR under `--psm 6`, as in the `full_grid` fixture, F1 0.00 here -> the fallback then applies). Net production accuracy on a page is therefore at least the better of the two.

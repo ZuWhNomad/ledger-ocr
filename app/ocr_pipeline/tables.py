@@ -135,6 +135,18 @@ def extract_words_table(page, carry_bounds=None):
     """
     words = page.extract_words(use_text_flow=False, keep_blank_chars=False,
                                extra_attrs=["size"])
+    return build_rows_from_words(words, page.width, carry_bounds)
+
+
+def build_rows_from_words(words, page_width, carry_bounds=None):
+    """Header-anchored row reconstruction from a list of word boxes.
+
+    Shared by the born-digital 'words' strategy (pdfplumber word coordinates) and the
+    scanned-document OCR path (Tesseract image_to_data word boxes). Each word is a dict
+    with text/x0/x1/top/bottom. This is the single source of truth for column anchoring,
+    leaked-token de-grouping, and wrapped-description merging, so scans and born-digital
+    pages share identical, tested column logic (the biggest OCR robustness win in PLAN.md).
+    """
     if not words:
         return [], carry_bounds
     rows = _cluster_rows(words)
@@ -145,7 +157,7 @@ def extract_words_table(page, carry_bounds=None):
         bounds = carry_bounds        # continuation page: reuse the prior header's columns
         data_rows = rows             # no header row to skip
     else:
-        bounds = _column_bounds(hdr_map, page.width)
+        bounds = _column_bounds(hdr_map, page_width)
         data_rows = rows[hdr_i + 1:]
 
     def assign(w) -> Optional[str]:

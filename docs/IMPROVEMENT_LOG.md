@@ -2,6 +2,40 @@
 
 Dated entries, newest first. Each phase of the production-readiness pass appends here.
 
+## 2026-09-13 — Phase 4B: OCR engine comparison + adopt the word-box path
+
+**Research (quantified in docs/BENCHMARK.md, "OCR engine comparison")**
+- Compared, locally, Tesseract `image_to_string` (Path A, the old textline parser) vs
+  `image_to_data` word-boxes + header-anchored reconstruction (Path B), on all 7 fixtures
+  rendered to clean 300-dpi images. **Path B aggregate micro-F1 ~0.91 vs Path A ~0.54** (and
+  slightly faster). Path B recovers debit/credit as separate columns, keeps wide descriptions
+  out of money cells, and carries columns across continuation pages. Path A cannot separate
+  debit/credit at all. No other engine evaluated: EasyOCR/PaddleOCR/onnx/torch would violate
+  the PLAN's no-heavy/native-dep rule — noted for the reviewer, not installed.
+
+**Adopted (production change)**
+- `tables.py`: extracted the header-anchored reconstruction into a shared
+  `build_rows_from_words(words, page_width, carry_bounds)`; `extract_words_table` now calls it.
+- `extract.py`: added `ocr_to_rows()` (rasterize -> `image_to_data --psm 6` ->
+  `build_rows_from_words`, carrying column bounds across pages) plus shared `_iter_page_images`
+  / `_ocr_scope` helpers. `ocr_to_text` kept for the fallback.
+- `pipeline.py`: `_ocr_extract` uses the word-box path first and falls back to the text-line
+  parser only when it recovers no rows (handles border-heavy scans like `full_grid`). The
+  summary `strategy` now reports `ocr-words` or `ocr-textlines`.
+- Scans and born-digital PDFs now share ONE tested column code path (PLAN's biggest OCR win).
+
+**Verified (ran myself)**
+- `python app/tests/test_pipeline.py` -> 12/12 (new `test_ocr_words_path_recovers_columns`
+  renders the sample to a PNG, routes through OCR, and asserts debit AND credit are recovered
+  and the injected balance error is still flagged; skips if Tesseract is absent).
+- `python app/tests/bench.py` unchanged (born-digital micro-F1 0.9948).
+- `python app/tests/bench_ocr.py` -> Path B 0.9140 vs Path A 0.5419 (Path B now runs the exact
+  production `build_rows_from_words`, so the benchmark can't drift from shipped behavior).
+
+**Note**
+- The 4B worker (gemini-3.8-flash-low) claimed it updated docs/BENCHMARK.md but had not; I wrote
+  that section myself from the reproduced numbers. bench.py's `score_rows` refactor was correct.
+
 ## 2026-09-13 — Phase 4A: Benchmark harness + ground-truth fixtures
 
 **Added**

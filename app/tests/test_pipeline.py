@@ -194,6 +194,32 @@ def test_ocr_textline_parser():
     assert rows[1]["amount"] == "2,000.00"
 
 
+def test_ocr_words_path_recovers_columns():
+    """Scanned path: the image_to_data word-box reconstruction recovers separate debit/credit
+    columns (the plain-text parser cannot) and still flags the injected balance error.
+    Skips cleanly if the Tesseract OCR engine is not installed."""
+    from ocr_pipeline import extract as EX
+    if not EX.ocr_available():
+        print("SKIP test_ocr_words_path_recovers_columns (Tesseract not installed)")
+        return
+    import tempfile
+    import pdfplumber
+    _ensure_sample()
+    with tempfile.TemporaryDirectory() as td:
+        png = os.path.join(td, "scan.png")
+        with pdfplumber.open(SAMPLE) as pdf:
+            pdf.pages[0].to_image(resolution=300).original.save(png)
+        r = process(png, strategy="words")
+    assert r["ok"], r
+    assert r["route"] == "ocr", r["route"]
+    assert r["summary"]["strategy"] == "ocr-words", r["summary"]
+    # debit AND credit recovered as distinct columns (impossible via image_to_string path)
+    assert any(row.get("debit") for row in r["rows"]), r["rows"]
+    assert any(row.get("credit") for row in r["rows"]), r["rows"]
+    # the deliberately corrupted running balance is still caught
+    assert r["summary"]["balance_mismatches"], r["summary"]
+
+
 def _run():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
