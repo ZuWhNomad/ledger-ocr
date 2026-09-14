@@ -185,6 +185,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, json.dumps({"error": "not found"}))
         q = parse_qs(parsed.query)
         strategy = (q.get("strategy", ["words"])[0])
+        mode = q.get("mode", ["auto"])[0]
         use_llm = q.get("llm", ["0"])[0] in ("1", "true", "yes")
         model_param = q.get("model", [None])[0]
         llm_model = model_param if model_param else VAL.get_model()
@@ -201,7 +202,7 @@ class Handler(BaseHTTPRequestHandler):
                 src = os.path.join(td, "input" + ext)
                 with open(src, "wb") as f:
                     f.write(raw)
-                out = process(src, outdir=td, strategy=strategy, use_llm=use_llm, llm_model=llm_model, basename="result")
+                out = process(src, outdir=td, strategy=strategy, use_llm=use_llm, llm_model=llm_model, basename="result", mode=mode)
                 if not out.get("ok"):
                     return self._send(200, json.dumps(out))
                 resp = {
@@ -215,6 +216,8 @@ class Handler(BaseHTTPRequestHandler):
                     resp["document_shape"] = out["document_shape"]
                 if out.get("message"):
                     resp["message"] = out["message"]
+                if out.get("text_preview") is not None:
+                    resp["text_preview"] = out["text_preview"]
                 for kind, mime in (("csv", "text/csv"),
                                    ("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
                                    ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),

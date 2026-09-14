@@ -171,8 +171,29 @@ def raw_text(path: str, route: str = "") -> str:
     """Best-effort extract raw text when no table structure is recognized. Never raises."""
     try:
         ext = os.path.splitext(path)[1].lower()
-        if ext in STRUCTURED_EXTS:
-            return ""
+        if ext in (".xlsx", ".xlsm"):
+            import openpyxl
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            try:
+                lines = []
+                for ws in wb.worksheets:
+                    for row in ws.iter_rows(values_only=True):
+                        vals = [str(v) for v in row if v is not None and str(v) != ""]
+                        if vals:
+                            lines.append(" ".join(vals))
+                return "\n".join(lines)
+            finally:
+                wb.close()
+        if ext == ".docx":
+            import docx
+            d = docx.Document(path)
+            parts = [p.text for p in d.paragraphs if p.text]
+            for table in d.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text:
+                            parts.append(cell.text)
+            return "\n".join(parts)
         if is_image(path) or "ocr" in route:
             try:
                 return ocr_to_text(path)
