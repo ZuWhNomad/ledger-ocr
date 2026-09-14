@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OCR-Pipeline — Statement to Spreadsheet</title>
+<title>OCR-Pipeline — documents to spreadsheet or text</title>
 <style>
   :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --ink:#e2e8f0; --mut:#94a3b8;
           --accent:#38bdf8; --warn:#f59e0b; --warnbg:#42260a; --ok:#22c55e; }
@@ -44,16 +44,19 @@
   @keyframes spin { to { transform:rotate(360deg); } }
   .opts label.disabled { opacity:.5; cursor:not-allowed; }
   .note { color:var(--mut); font-size:12px; margin-top:6px; }
+  pre.text-preview { max-height:360px; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    white-space:pre-wrap; overflow-wrap:anywhere; background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:12px; margin:12px 0; font-size:13px; }
 </style>
 </head>
 <body>
 <header>
-  <h1><span>OCR</span>-Pipeline &mdash; bank statement / ledger &rarr; spreadsheet</h1>
-  <div class="sub" id="subline">Runs entirely on your machine. No cloud. PDF, or scan/image (PNG/JPG/TIFF).</div>
+  <h1><span>OCR</span>-Pipeline &mdash; tables to spreadsheet, anything else to text</h1>
+  <div class="sub" id="subline">Runs entirely on your machine. No cloud. Ledgers and tables become CSV/Excel; receipts, letters, and photos become text or Word.</div>
 </header>
 <main>
   <div id="drop">
-    <h2 id="dropTitle">Drop a PDF or image here</h2>
+    <h2 id="dropTitle">Drop a PDF, photo, or document here</h2>
     <p id="dropHint">or click to choose a file</p>
     <input type="file" id="file" hidden accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.webp,.heic,.heif,.xlsx,.xlsm,.docx">
   </div>
@@ -65,6 +68,14 @@
         <option value="words">words (default)</option>
         <option value="lines">lines</option>
       </select></span>
+    <span>output:
+      <select id="mode" style="background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px;">
+        <option value="auto" selected>Auto-detect (recommended)</option>
+        <option value="table">Ledger table → CSV / Excel</option>
+        <option value="text">Plain text → TXT / Word</option>
+      </select>
+      <span class="note">Auto picks a table when it finds one, otherwise plain text.</span>
+    </span>
     <span id="envOcr" class="badge off">OCR: ?</span>
     <button id="installOcr" hidden style="font-size:11px;padding:2px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;">Install OCR add-on</button>
     <span id="envLlm" class="badge off">LLM: ?</span>
@@ -195,26 +206,26 @@ async function upload(file, extraNote){
                      : ' — this can take a minute for large scans';
   $('#status').innerHTML = '<span class="working"><span class="spinner"></span>'
     + 'Working on <b>'+escapeHtml(file.name)+'</b>'+hint+'</span>' + (extraNote||'');
-  const qs = new URLSearchParams({ strategy:$('#strategy').value, llm: llmOn?'1':'0' });
+  const qs = new URLSearchParams({ strategy:$('#strategy').value, llm: llmOn?'1':'0', mode: $('#mode').value });
   try{
     const r = await fetch('/api/process?'+qs, { method:'POST',
       headers:{'X-Filename':file.name}, body:file });
     const d = await r.json();
     if(!d.ok){ $('#status').innerHTML = '<span class="err">'+ escapeHtml(d.error||'failed') +'</span>'; return; }
-    if(d.document_shape === 'unrecognized'){ renderUnrecognized(d); return; }
+    if(d.document_shape === 'text'){ renderText(d); return; }
     render(d, llmOn);
   }catch(err){ $('#status').innerHTML = '<span class="err">'+escapeHtml(String(err))+'</span>'; }
 }
 
-// A file with no bank-statement/ledger table (e.g. a receipt): show the plain-English
-// explanation and offer the raw recognized text -- never a header-only "ledger" CSV.
-function renderUnrecognized(d){
-  $('#status').innerHTML = 'Done &mdash; no bank-statement/ledger table found';
+function renderText(d){
+  $('#status').innerHTML = 'Done &mdash; extracted as plain text';
   const base=(d.filename||'result').replace(/\.[^.]+$/,'');
   $('#summary').innerHTML = '<div class="chip" style="max-width:100%;white-space:normal;line-height:1.5;">'
     + escapeHtml(d.message||'') + '</div>';
-  $('#result').innerHTML = '';
-  if(d.text_b64) $('#dl').appendChild(dlBtn('Download recognized text (.txt)', d.text_b64, 'text/plain', base+'.txt'));
+  $('#result').innerHTML = '<pre class="text-preview">'+escapeHtml(d.text_preview||'')+'</pre>';
+  if(d.text_b64) $('#dl').appendChild(dlBtn('Download text (.txt)', d.text_b64, 'text/plain', base+'.txt'));
+  if(d.docx_b64) $('#dl').appendChild(dlBtn('Download Word (.docx)', d.docx_b64,
+     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', base+'.docx'));
 }
 
 function render(d, llmRequested){
