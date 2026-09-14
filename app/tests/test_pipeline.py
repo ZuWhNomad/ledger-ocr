@@ -436,6 +436,43 @@ def test_ledger_still_recognized():
         assert r["outputs"].get("csv") and os.path.exists(r["outputs"]["csv"])
 
 
+def test_prose_pdf_extracts_text():
+    """Born-digital prose PDF (no table) extracts as raw text, not a ledger."""
+    import tempfile
+    path = _make_fixture("make_prose_pdf", "fixture_prose.pdf")
+    with tempfile.TemporaryDirectory() as td:
+        r = process(path, outdir=td, mode="auto")
+        assert r["ok"], r
+        assert r["document_shape"] == "text", r["document_shape"]
+        assert r["rows"] == []
+        text_file = r["outputs"].get("text")
+        assert text_file and os.path.exists(text_file), r["outputs"]
+        with open(text_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "powerhouse of the cell" in content, content
+
+
+def test_spreadsheet_image_to_xlsx():
+    """IMAGE of a printed debit/credit table extracts as a ledger XLSX via OCR."""
+    if not EX.ocr_available():
+        print("SKIP test_spreadsheet_image_to_xlsx (Tesseract not installed)")
+        return
+    import tempfile
+    import pdfplumber
+    _ensure_sample()
+    with tempfile.TemporaryDirectory() as td:
+        png = os.path.join(td, "ledger.png")
+        with pdfplumber.open(SAMPLE) as pdf:
+            pdf.pages[0].to_image(resolution=300).original.save(png)
+        r = process(png, outdir=td, mode="auto")
+        assert r["ok"], r
+        assert r["document_shape"] == "ledger", r["document_shape"]
+        assert len(r["rows"]) > 0, r["rows"]
+        assert r["route"] == "ocr", r["route"]
+        assert "xlsx" in r["outputs"], r["outputs"]
+        assert os.path.exists(r["outputs"]["xlsx"]), r["outputs"]["xlsx"]
+
+
 def test_receipt_photo_extracts_text():
     jpg_path = os.path.join(ROOT, "tests", "fixtures", "real", "receipt_pharmacy.jpg")
     if not EX.ocr_available():

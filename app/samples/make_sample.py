@@ -164,6 +164,41 @@ def make_two_page_pdf(path):
     c.save()
 
 
+def make_prose_pdf(path):
+    """Born-digital PDF of 2–3 plain prose paragraphs with no table.
+
+    Schoolwork-style passage used to prove general-document PDFs extract as
+    raw text (document_shape=text) rather than a ledger.
+    """
+    c = canvas.Canvas(path, pagesize=letter)
+    _, h = letter
+    left = 0.75 * inch
+    y = h - 1.0 * inch
+
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(left, y, "A Short Note on Cells")
+    y -= 0.4 * inch
+
+    c.setFont("Helvetica", 11)
+    lines = [
+        "Cells are the basic units of life. Every living organism is made of one or more",
+        "cells, and each cell carries out the chemical work that keeps the organism alive.",
+        "",
+        "The mitochondria is the powerhouse of the cell. It converts the energy stored in",
+        "food into a form the cell can use, a molecule called ATP.",
+        "",
+        "Students often first meet this idea in a middle-school life-science unit. The same",
+        "sentence is repeated in textbooks because it names both the organelle and its role.",
+    ]
+    for line in lines:
+        if line:
+            c.drawString(left, y, line)
+        y -= 16
+
+    c.showPage()
+    c.save()
+
+
 def make_bleed_pdf(path):
     """A wide description whose trailing token drifts toward the right-aligned amount column.
     Exercises tables.py P1-3 (description text must not concatenate into a giant fake
