@@ -40,6 +40,16 @@ def to_text(text: str, path: str) -> str:
     return path
 
 
+def to_docx_text(text: str, path: str) -> str:
+    from docx import Document
+    doc = Document()
+    paragraphs = [p for p in text.split("\n\n") if p] or text.splitlines()
+    for paragraph in paragraphs:
+        doc.add_paragraph(paragraph)
+    doc.save(path)
+    return path
+
+
 def _xlsx_cell(row: Dict, col: str):
     """Cell value for XLSX: money columns become real numbers (exact parsed Decimal, so
     Excel can sum/filter them and no float rounding is introduced); everything else is the

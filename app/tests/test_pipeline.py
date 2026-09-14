@@ -370,11 +370,11 @@ def test_webp_and_heic_are_images():
     assert ".webp" in EX.IMAGE_EXTS and ".heic" in EX.IMAGE_EXTS and EX.is_image("x.webp")
 
 
-def test_docx_no_table_unrecognized():
+def test_docx_no_table_extracts_text():
     try:
         import docx
     except ImportError:
-        print("SKIP test_docx_no_table_unrecognized (python-docx not installed)")
+        print("SKIP test_docx_no_table_extracts_text (python-docx not installed)")
         return
     import tempfile
     with tempfile.TemporaryDirectory() as td:
@@ -385,11 +385,44 @@ def test_docx_no_table_unrecognized():
 
         r = process(path, outdir=td)
         assert r["ok"], r
-        assert r["document_shape"] == "unrecognized", r["document_shape"]
+        assert r["document_shape"] == "text", r["document_shape"]
         assert len(r["rows"]) == 0, r["rows"]
-        assert "message" in r, r
         assert "csv" not in r["outputs"], r["outputs"]
         assert r["outputs"].get("text") and os.path.exists(r["outputs"]["text"])
+        assert r["outputs"].get("docx")
+        with open(r["outputs"]["text"], "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "document" in content and "tables" in content
+
+
+def test_text_mode_forces_text():
+    _ensure_sample()
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        r = process(SAMPLE, outdir=td, mode="text")
+        assert r["document_shape"] == "text", r
+        assert r["outputs"].get("text")
+        with open(r["outputs"]["text"], "r", encoding="utf-8") as f:
+            assert f.read().strip()
+        assert r["rows"] == []
+
+
+def test_table_mode_zero_rows_falls_back_to_text():
+    try:
+        import docx
+    except ImportError:
+        print("SKIP test_table_mode_zero_rows_falls_back_to_text (python-docx not installed)")
+        return
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "no_table.docx")
+        doc = docx.Document()
+        doc.add_paragraph("Only paragraph text.")
+        doc.save(path)
+        r = process(path, outdir=td, mode="table")
+        assert r["document_shape"] == "text", r
+        assert "csv" not in r["outputs"]
+        assert r["outputs"].get("text")
 
 
 def test_ledger_still_recognized():
@@ -403,18 +436,17 @@ def test_ledger_still_recognized():
         assert r["outputs"].get("csv") and os.path.exists(r["outputs"]["csv"])
 
 
-def test_receipt_photo_unrecognized():
+def test_receipt_photo_extracts_text():
     jpg_path = os.path.join(ROOT, "tests", "fixtures", "real", "receipt_pharmacy.jpg")
     if not EX.ocr_available():
-        print("SKIP test_receipt_photo_unrecognized (Tesseract not installed)")
+        print("SKIP test_receipt_photo_extracts_text (Tesseract not installed)")
         return
     import tempfile
     with tempfile.TemporaryDirectory() as td:
         r = process(jpg_path, outdir=td)
         assert r["ok"], r
-        assert r["document_shape"] == "unrecognized", r["document_shape"]
+        assert r["document_shape"] == "text", r["document_shape"]
         assert len(r["rows"]) == 0, r["rows"]
-        assert "message" in r, r
         assert "csv" not in r["outputs"], r["outputs"]
         text_file = r["outputs"].get("text")
         assert text_file and os.path.exists(text_file)

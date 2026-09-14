@@ -65,15 +65,27 @@ def _ocr_extract(path: str):
 
 def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
             use_llm: bool = False, llm_model: Optional[str] = None,
-            basename: Optional[str] = None) -> Dict:
+            basename: Optional[str] = None, mode: str = "auto") -> Dict:
     """Run the full pipeline on one file. Returns a result dict with rows, summary, outputs."""
     if strategy not in ("words", "lines"):
         # Reject rather than silently falling through to 'lines' while the summary echoes
         # the user's (possibly typo'd) string as if it had been honored.
         return {"ok": False, "error": f"unknown strategy '{strategy}' (expected 'words' or 'lines')"}
+    if mode not in ("auto", "table", "text"):
+        return {"ok": False, "error": f"unknown mode '{mode}' (expected 'auto', 'table', or 'text')"}
     path = os.path.abspath(path)
     ext = os.path.splitext(path)[1].lower()
     ocr_method: Optional[str] = None
+    if mode == "text":
+        route = "structured" if ext in EX.STRUCTURED_EXTS else ("ocr" if EX.is_image(path) else ("ocr" if EX.looks_scanned(path) else "born-digital"))
+        if ext in (".heic", ".heif"):
+            try:
+                import pillow_heif
+            except Exception:
+                return {"ok": False, "route": route, "error": "HEIC/HEIF photos need the optional 'pillow-heif' add-on, which isn't installed. On iPhone set Settings > Camera > Formats > Most Compatible, or convert the photo to JPG/PNG and try again."}
+        if route == "ocr" and not EX.ocr_available():
+            return {"ok": False, "route": route, "error": "This looks like a scan or photo, which needs the free OCR add-on to read. Born-digital PDFs (exported from your bank or accounting software) work without it. To read scans and photos, install the OCR add-on — see \"Reading scans and photos\" in the Getting Started guide."}
+        return _text_result(path, route, outdir, basename, strategy)
     if ext in EX.STRUCTURED_EXTS:
         try:
             raw = EX.extract_structured(path)
@@ -116,17 +128,11 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
     summary["strategy"] = ocr_method or strategy
 
     unrecognized = (len(rows) == 0)
-    summary["document_shape"] = "unrecognized" if unrecognized else "ledger"
+    summary["document_shape"] = "ledger"
 
     outputs = {}
     if unrecognized:
-        if outdir:
-            os.makedirs(outdir, exist_ok=True)
-            stem = basename or os.path.splitext(os.path.basename(path))[0]
-            outputs["text"] = XP.to_text(EX.raw_text(path, route), os.path.join(outdir, stem + ".txt"))
-        return {"ok": True, "route": route, "summary": summary, "rows": [], "document_shape": "unrecognized",
-                "message": "No bank-statement or ledger table was found in this file. LedgerOCR reads statements and ledgers that have a Date column and money columns (Debit/Credit/Balance, or a single Amount). This file looks like a receipt, letter, or other non-ledger document, so there is nothing to convert into rows. The raw recognized text is available below.",
-                "outputs": outputs}
+        return _text_result(path, route, outdir, basename, strategy, "No table was detected, so the full text was extracted.")
 
     llm_info = {"enabled": False}
     if use_llm and summary.get("balance_mismatches"):
@@ -146,4 +152,22 @@ def process(path: str, outdir: Optional[str] = None, strategy: str = "words",
         except Exception as e:  # python-docx missing -> CSV/XLSX still delivered
             outputs["docx_error"] = str(e)
 
+    summary["output_mode"] = "table"
     return {"ok": True, "route": route, "summary": summary, "rows": rows, "outputs": outputs, "document_shape": "ledger"}
+
+
+def _text_result(path, route, outdir, basename, strategy, message=None):
+    text = EX.raw_text(path, route)
+    outputs = {}
+    if outdir:
+        os.makedirs(outdir, exist_ok=True)
+        stem = basename or os.path.splitext(os.path.basename(path))[0]
+        outputs["text"] = XP.to_text(text, os.path.join(outdir, stem + ".txt"))
+        try:
+            outputs["docx"] = XP.to_docx_text(text, os.path.join(outdir, stem + ".docx"))
+        except Exception as e:
+            outputs["docx_error"] = str(e)
+    summary = {"document_shape": "text", "output_mode": "text", "strategy": strategy, "route": route}
+    return {"ok": True, "route": route, "summary": summary, "rows": [], "document_shape": "text",
+            "message": message or "This document isn't a ledger table, so its full text was extracted. Download it as plain text (.txt) or Word (.docx).",
+            "text_preview": text[:2000], "outputs": outputs}
