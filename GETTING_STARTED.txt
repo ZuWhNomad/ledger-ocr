@@ -2,9 +2,11 @@
 LEDGER OCR - GETTING STARTED GUIDE
 ================================================================================
 
-Ledger OCR turns bank statements and general ledgers into clean tables. It reads
-PDFs, scans, photos, and Excel and Word files, and saves the result as CSV,
-Excel (.xlsx), or Word (.docx) - entirely on your local computer. Your financial
+Ledger OCR reads a document and turns it into something you can use - entirely
+on your local computer. Bank statements, general ledgers, and spreadsheets
+become clean tables (CSV, Excel, or Word). Receipts, letters, schoolwork, and
+other documents or photos become plain text (TXT) or Word (.docx). It reads
+PDFs, scans, photos, and Excel and Word files, and never refuses a file. Your
 data is never uploaded to the internet or cloud.
 
 
@@ -22,17 +24,23 @@ data is never uploaded to the internet or cloud.
 3. PROCESSING A DOCUMENT
 - Drag your PDF, image, Excel, or Word file directly onto the drop area, or
   click to choose a file from your computer.
+- Optional: use the "output" selector to choose what you get back:
+    * Auto-detect (recommended) - a table if the file has one, otherwise text.
+    * Ledger table - force CSV / Excel output.
+    * Plain text - force TXT / Word output (receipts, letters, schoolwork).
 - Wait a few seconds while the document is processed.
-- A table preview of your transactions will appear on screen.
-- Rows that the tool detects may contain a math error are highlighted for
-  your review.
+- If the file is a ledger or table, a table preview appears and rows that may
+  contain a math error are highlighted for your review.
+- If the file is any other document, a preview of its recognized text appears.
 
 
-4. DOWNLOADING YOUR TABLE
-- Click "Download CSV", "Download XLSX" (Excel), or "Download DOCX" (Word).
-- The file will be saved directly to your Downloads folder.
-- You can open and edit it immediately in Microsoft Excel, Google Sheets, or
-  Microsoft Word. Flagged rows are highlighted in the Excel and Word files.
+4. DOWNLOADING YOUR RESULT
+- For a table: click "Download CSV", "Download XLSX" (Excel), or "Download DOCX"
+  (Word). Flagged rows are highlighted in the Excel and Word files.
+- For a plain-text document: click "Download text (.txt)" or "Download Word
+  (.docx)".
+- The file is saved directly to your Downloads folder. You can open and edit it
+  immediately in Microsoft Excel, Google Sheets, or Microsoft Word.
 
 
 5. SCANNED DOCUMENTS AND PHOTOS

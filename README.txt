@@ -3,9 +3,12 @@ LEDGER OCR
 ================================================================================
 
 WHAT IT DOES
-Ledger OCR turns bank statements and general ledgers into clean, ready-to-use
-tables. It reads PDFs, scans, and photos, and also Excel and Word files, and
-saves the result as CSV, Excel (.xlsx), or Word (.docx).
+Ledger OCR reads a document on your computer and turns it into something you can
+use. Bank statements, general ledgers, and spreadsheets become clean, ready-to-
+use tables (CSV, Excel, or Word). Receipts, letters, schoolwork, and other
+documents or photos become plain text (TXT) or a Word (.docx) file. It reads
+PDFs, scans, photos, and Excel and Word files, and it never refuses a file - if a
+page is not a table, you get its text instead of nothing.
 
 Everything runs 100% locally on your computer. No internet connection is
 required, no cloud services are used, and nothing is uploaded. Confidential
@@ -23,10 +26,13 @@ HOW TO USE
    Your web browser opens a local page.
 2. Drag a PDF, image, Excel, or Word file onto the drop area (or click to
    choose a file). Wait a few seconds.
-3. A table preview of the transactions appears. Rows the tool thinks may
-   contain an error are highlighted.
-4. Click "Download CSV", "Download XLSX" (Excel), or "Download DOCX" (Word).
-   The file saves to your Downloads folder. Open it in Excel or Google Sheets.
+3. Optional: use the "output" selector to choose what you get back -
+   Auto-detect (recommended; a table if the file has one, otherwise text),
+   Ledger table (force CSV / Excel), or Plain text (force TXT / Word).
+4. For a table, a preview of the transactions appears (rows that may contain an
+   error are highlighted); download it as CSV, XLSX (Excel), or DOCX (Word).
+   For any other document, a text preview appears; download it as text (.txt)
+   or Word (.docx). Files save to your Downloads folder.
 
 For detailed step-by-step guidance, see GETTING_STARTED.txt.
 
