@@ -102,6 +102,12 @@ if ($iscc) {
   & $iscc @isccArgs
   if ($LASTEXITCODE -ne 0) { throw "ISCC compile failed" }
   Write-Host "Done: installer\Output\LedgerOCR-Setup.exe" -ForegroundColor Green
+  # Anti-stale-exe guard: keep the repo-root LedgerOCR-Setup.exe (the copy a user may
+  # double-click, and the one the README/Getting Started name) in lockstep with the
+  # freshly compiled installer, so a stale root Setup.exe can never ship old behavior.
+  # Both copies are git-ignored build artifacts.
+  Copy-Item -Path "installer\Output\LedgerOCR-Setup.exe" -Destination (Join-Path $repo "LedgerOCR-Setup.exe") -Force
+  Write-Host "Refreshed repo-root LedgerOCR-Setup.exe from the new build." -ForegroundColor Green
   if (-not $signConfigured) {
     Write-Host "(unsigned build -- see GETTING_STARTED.txt 'If Windows shows a blue warning')" -ForegroundColor Yellow
   }
