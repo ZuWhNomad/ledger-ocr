@@ -123,10 +123,17 @@ function render(job, name, d) {
   const links = document.createElement('div'); links.className = 'dl';
   for (const k of ['csv', 'xlsx', 'docx', 'text'])
     if (d[k + '_b64']) links.appendChild(dl('Download ' + (k === 'text' ? 'TXT' : k.toUpperCase()), d[k + '_b64'], MIME[k], base + (k === 'text' ? '.txt' : '.' + k)));
-  if (d.document_shape === 'text') {
+  if (d.document_shape !== 'ledger') {
     h += `<div class="summary"><div class="chip">${esc(d.message)}</div><div class="chip">read by <b>${esc(read)}</b></div></div>`;
     job.innerHTML = h; job.appendChild(links);
-    job.insertAdjacentHTML('beforeend', `<pre class="text">${esc(d.text_preview)}</pre>`);
+    if (d.document_shape === 'table') {
+      const w = Math.max(...d.grid.map(r => r.length));
+      job.insertAdjacentHTML('beforeend', '<div class="tablewrap"><table><tbody>'
+        + d.grid.map(r => '<tr>' + Array.from({ length: w }, (_, i) => `<td>${esc(r[i])}</td>`).join('') + '</tr>').join('')
+        + '</tbody></table></div>');
+    } else {
+      job.insertAdjacentHTML('beforeend', `<pre class="text">${esc(d.text_preview)}</pre>`);
+    }
     return;
   }
   h += `<div class="summary"><div class="chip">rows <b>${s.rows}</b></div>`

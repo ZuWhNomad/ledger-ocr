@@ -209,3 +209,64 @@ def records_from_grid(tbl: List[List[str]]) -> List[Dict[str, str]]:
         if rec:
             out.append(rec)
     return out
+
+
+# ---- generic tables (no ledger header) -------------------------------------------------------
+
+def grid_from_words(words, page_width, min_rows: int = 3):
+    """Any table, without knowing its headers: columns are the vertical white gaps that run
+    through the rows. Returns a grid of cell strings, or [] when the page does not look tabular
+    (fewer than `min_rows` rows with two or more cells). Column choice: a 1pt bin is a
+    separator when at most a quarter of the rows spanning it have ink there; separators
+    narrower than three character widths are ignored (those are plain word spaces)."""
+    if not words:
+        return []
+    rows = _cluster_rows(words)
+    cw = sorted((w["x1"] - w["x0"]) / max(1, len(w["text"])) for w in words)
+    min_gap = 3.0 * cw[len(cw) // 2]
+    width = int(page_width) + 1
+    spanning = [0] * width      # rows with ink on both sides of this x
+    inked = [0] * width         # of those, rows with ink AT this x
+    for row in rows:
+        lo, hi = min(w["x0"] for w in row), max(w["x1"] for w in row)
+        for x in range(max(0, int(lo)), min(width, int(hi) + 1)):
+            spanning[x] += 1
+        for w in row:
+            for x in range(max(0, int(w["x0"])), min(width, int(w["x1"]) + 1)):
+                inked[x] += 1
+    seps, start = [], None
+    for x in range(width + 1):
+        empty = x < width and spanning[x] >= 2 and inked[x] <= 0.25 * spanning[x]
+        if empty and start is None:
+            start = x
+        elif not empty and start is not None:
+            if x - start >= min_gap:
+                seps.append((start + x) / 2)
+            start = None
+    if not seps:
+        return []
+    grid = []
+    for row in rows:
+        cells = [[] for _ in range(len(seps) + 1)]
+        for w in row:
+            mid = (w["x0"] + w["x1"]) / 2
+            cells[sum(mid > s for s in seps)].append(w["text"])
+        grid.append([" ".join(c) for c in cells])
+    if sum(1 for r in grid if sum(bool(c) for c in r) >= 2) < min_rows:
+        return []
+    return grid
+
+
+_PAIR = re.compile(r"([A-Za-z][A-Za-z .#/'-]{0,28}?)\s*(?<!\d)[:•](?!\d)\s*(.+?)(?=\s+[A-Za-z][A-Za-z .#/'-]{0,28}?\s*(?<!\d)[:•](?!\d)\s|$)")
+
+
+def pairs_from_text(text: str, min_pairs: int = 3):
+    """'Label: value' pairs from free text (a receipt, a form, a slip): a two-column grid, or []
+    when fewer than `min_pairs` are found. A colon between digits (10:00) is a time, not a pair."""
+    grid = [["field", "value"]]
+    for line in text.splitlines():
+        for m in _PAIR.finditer(line.strip()):
+            label, value = m.group(1).strip(" .-"), m.group(2).strip(" .:•-")
+            if label and value:
+                grid.append([label, value])
+    return grid if len(grid) > min_pairs else []

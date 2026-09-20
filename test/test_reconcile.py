@@ -38,6 +38,13 @@ def test_parse_money_locale_thousands():
     assert p("1,234.56 (2)") is None
 
 
+def test_ocr_digit_lookalikes():
+    p = RC.parse_money
+    assert p("5000.oo") == Decimal("5000.00") and p("o.oo") == Decimal("0.00") and p("l2.50") == Decimal("12.50")
+    assert p("12.a5") is None and p("S2.50") is None        # a real letter inside a number: never guess
+    assert RC.fix_ocr_digits("Total o.oo due") == "Total 0.00 due"
+
+
 def test_sign_autodetect_ledger_debit_raises():
     """Asset-side ledger where debits INCREASE the balance -> auto-detected."""
     raw = [

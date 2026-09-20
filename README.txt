@@ -4,9 +4,10 @@ LEDGER OCR
 
 WHAT IT DOES
 Ledger OCR reads a document on your computer and turns it into something you can
-use. Bank statements, general ledgers, and spreadsheets become clean tables (CSV,
-Excel, Word), with any row whose running balance does not add up flagged.
-Receipts, letters, and other documents or photos become plain text (TXT, Word).
+use. Bank statements and general ledgers become clean tables (CSV, Excel, Word),
+with any row whose running balance does not add up flagged. Other tables (a tax
+slip, an invoice, a price list) and receipts or forms with "Label: value" lines
+become a spreadsheet (CSV, Excel). Everything else becomes text (TXT, Word).
 It reads PDFs, scans, phone photos, and Excel and Word files, and it never
 refuses a readable file - if a page is not a table, you get its text.
 

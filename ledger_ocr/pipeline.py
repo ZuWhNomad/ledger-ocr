@@ -3,8 +3,9 @@
     from ledger_ocr.pipeline import process
     result = process("statement.pdf", outdir="out")
 
-mode: "auto"  ledger table found -> CSV/XLSX/DOCX; otherwise -> plain text (TXT/DOCX)
-      "table" same, stated intent (zero rows still falls back to text, never an empty CSV)
+mode: "auto"  ledger table found -> CSV/XLSX/DOCX (balances checked); any other table -> CSV/XLSX;
+              otherwise -> plain text (TXT/DOCX)
+      "table" same, stated intent (nothing tabular still falls back to text, never an empty CSV)
       "text"  always plain text
 """
 from __future__ import annotations
@@ -80,7 +81,11 @@ def process(path: str, outdir: Optional[str] = None, mode: str = "auto",
     except (R.NoOcrEngine, ValueError) as e:
         return {"ok": False, "error": str(e)}
 
-    shape = "ledger" if rows else "text"
+    # No ledger? Any other table (a tax slip, an invoice, a price list) still becomes a spreadsheet.
+    grid = [] if rows or mode == "text" else _grid(pages if R.ext_of(path) not in R.GRID_EXTS else [])
+    if not rows and not grid and mode != "text":
+        grid = T.pairs_from_text(text)         # a receipt or form: "Label: value" lines
+    shape = "ledger" if rows else ("table" if grid else "text")
     summary.update(sources=sources, document_shape=shape)
 
     outputs: Dict[str, str] = {}
@@ -90,18 +95,30 @@ def process(path: str, outdir: Optional[str] = None, mode: str = "auto",
         if rows:
             outputs["csv"] = XP.to_csv(rows, stem + ".csv")
             optional = (("xlsx", XP.to_xlsx, rows), ("docx", XP.to_docx, rows))
+        elif grid:
+            outputs["csv"] = XP.grid_to_csv(grid, stem + ".csv")
+            optional = (("xlsx", XP.grid_to_xlsx, grid), ("text", XP.to_text, text))
         else:
             outputs["text"] = XP.to_text(text, stem + ".txt")
             optional = (("docx", XP.to_docx_text, text),)
         for kind, write, payload in optional:
             try:
-                outputs[kind] = write(payload, f"{stem}.{kind}")
+                outputs[kind] = write(payload, f"{stem}.{'txt' if kind == 'text' else kind}")
             except Exception as e:     # optional writer missing -> the primary output still ships
                 outputs[kind + "_error"] = str(e)
 
-    result = {"ok": True, "document_shape": shape, "summary": summary, "rows": rows, "outputs": outputs}
+    result = {"ok": True, "document_shape": shape, "summary": summary, "rows": rows, "grid": grid,
+              "outputs": outputs}
     if not rows:
         result["text_preview"] = text[:2000]
-        result["message"] = ("Plain text extracted." if mode == "text"
-                             else "No ledger table was detected, so the full text was extracted.")
+        result["message"] = ("Plain text extracted." if mode == "text" else
+                             "A table was found (not a ledger, so no balance check)." if grid else
+                             "No table was detected, so the full text was extracted.")
     return result
+
+
+def _grid(pages: List[Dict]) -> List[List[str]]:
+    grid = []
+    for p in pages:
+        grid.extend(T.grid_from_words(p["words"], p["width"]))
+    return [[RC.fix_ocr_digits(c) for c in row] for row in grid]

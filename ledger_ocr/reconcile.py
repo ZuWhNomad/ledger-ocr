@@ -71,7 +71,12 @@ def _valid_groups(int_part: str, thou: str) -> bool:
 # OCR engines tuned for prose read 0 as o/O and 1 as l/I/| ("5000.oo"). Inside a token that is
 # otherwise purely numeric (and has a real digit) those letters can only be digits.
 _OCR_DIGITS = str.maketrans("OoIl|", "00111")
-_NUMERIC_TOKEN = re.compile(r"[($\-]*[\dOoIl|.,]*\d[\dOoIl|.,]*[)\-]*")
+_NUMERIC_TOKEN = re.compile(r"[($\-]*[\dOoIl|.,]*\d[\dOoIl|.,]*[)\-]*|[oO]{1,3}[.,][oO]{2}")   # 5000.oo / o.oo
+
+
+def fix_ocr_digits(t: str) -> str:
+    """"5000.oo" -> "5000.00", "o.oo" -> "0.00": only inside tokens that are otherwise numeric."""
+    return " ".join(tok.translate(_OCR_DIGITS) if _NUMERIC_TOKEN.fullmatch(tok) else tok for tok in t.split())
 
 
 def parse_money(s: Optional[str]) -> Optional[Decimal]:
@@ -89,7 +94,7 @@ def parse_money(s: Optional[str]) -> Optional[Decimal]:
     if t.startswith("(") and t.endswith(")"):
         neg = True
         t = t[1:-1]
-    t = " ".join(tok.translate(_OCR_DIGITS) if _NUMERIC_TOKEN.fullmatch(tok) else tok for tok in t.split())
+    t = fix_ocr_digits(t)
     if re.search(r"[\d.,][A-Za-z]+\d|^(?![A-Z]{3}\d)[A-Za-z]+\d", t):
         return None     # a letter inside/glued onto a number (not a currency code): dropping it
                         # would silently invent a value ("12.a5" -> 12.5, "S2.50" -> 2.50)

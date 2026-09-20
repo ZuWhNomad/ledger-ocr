@@ -200,6 +200,10 @@ def _ocr_page(img, engine: str, unit: float = 1.0) -> Dict:
         for w in words:
             for k in ("x0", "x1", "top", "bottom"):
                 w[k] /= unit
+    # Reading order from geometry, not from the engine: Windows OCR returns a table column by
+    # column, which scrambles the plain-text output. Rows top-to-bottom, words left-to-right.
+    from .tables import _cluster_rows
+    text = "\n".join(" ".join(w["text"] for w in row) for row in _cluster_rows(words)) if words else text
     return {"words": words, "width": img.width / unit, "text": text, "source": name}
 
 

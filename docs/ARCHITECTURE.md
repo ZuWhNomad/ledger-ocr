@@ -16,15 +16,17 @@ file -> readers -> pages of word boxes -> tables -> rows -> reconcile -> export
    the page's skew and text height are measured from the word boxes; a leaning (> 0.3 deg) or small-text (< 20 px)
    page is levelled / enlarged and read once more. OCR'd PDF pages are scaled back to PDF points so column
    positions carry across pages. `.xlsx/.xlsm/.docx` become cell grids.
-2. **tables.py** - engine-agnostic. Finds the header row by keyword synonyms, turns header x-centres into column
-   bounds, assigns words to columns, pulls leaked description tokens out of money cells, merges wrapped
-   description lines, carries column bounds to continuation pages.
+2. **tables.py** - engine-agnostic. Ledger: finds the header row by keyword synonyms, turns header x-centres into
+   column bounds, assigns words to columns, pulls leaked description tokens out of money cells, merges wrapped
+   description lines, carries column bounds to continuation pages. Any other table (`grid_from_words`): columns
+   are the vertical white gaps shared by the rows. Forms/receipts (`pairs_from_text`): `Label: value` lines.
 3. **reconcile.py** - money to `Decimal` (US/EU formats, negatives, DR/CR; OCR digit look-alikes `o/O/l/I/|` are
    mapped only inside otherwise-numeric tokens; a letter inside a number rejects the cell rather than inventing a
    value). Votes on the debit sign convention, then flags rows whose running balance does not follow.
 4. **pipeline.py** - orchestration. With `engine="auto"` and several engines present, the balance check is the
    judge: engines are tried in turn until one yields rows that all reconcile; otherwise most verified rows wins
-   (tie: fewest unparseable money cells). No rows -> text output, never an empty CSV.
+   (tie: fewest unparseable money cells). Document shape, in order: `ledger` (balances checked) -> `table`
+   (generic grid, then label/value pairs; CSV/XLSX, no balance check) -> `text`. Never an empty CSV.
 5. **export.py** - CSV (stdlib, BOM for Excel), XLSX (flagged rows highlighted), DOCX table / DOCX text.
 6. **cli.py** - the entry point: `run-ledger-ocr FILE...` (`--json` for callers, `--health` for diagnostics);
    with no files, or `--ui`, it starts **server.py** and opens the browser.

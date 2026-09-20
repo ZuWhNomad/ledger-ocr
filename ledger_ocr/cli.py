@@ -60,7 +60,8 @@ def main(argv=None) -> int:
         else:
             s = r["summary"]
             flagged = f"{s['balance_mismatches']} flagged" if s["balance_checked"] else "balance not checked"
-            what = f"{len(r['rows'])} rows, {flagged}" if r["rows"] else "text"
+            what = (f"{len(r['rows'])} rows, {flagged}" if r["rows"] else
+                    f"table, {len(r['grid'])} rows" if r["grid"] else "text")
             print(f"{f}: {what} [{'+'.join(s['sources'])}] -> "
                   + ", ".join(os.path.basename(p) for k, p in r["outputs"].items() if not k.endswith("_error")))
     return 1 if failed else 0

@@ -132,3 +132,26 @@ def to_docx(rows: List[Dict], path: str) -> str:
                             run.font.color.rgb = RGBColor(255, 0, 0)
     doc.save(path)
     return path
+
+
+# ---- generic grids (any table) ---------------------------------------------------------------
+
+def grid_to_csv(grid: List[List[str]], path: str) -> str:
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        csv.writer(f).writerows(grid)
+    return path
+
+
+def grid_to_xlsx(grid: List[List[str]], path: str) -> str:
+    """Cells that read as money become real numbers; everything else stays text."""
+    from openpyxl import Workbook
+    from .reconcile import parse_money
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Table"
+    for row in grid:
+        ws.append([parse_money(c) if parse_money(c) is not None else c for c in row])
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = min(60, max(10, max(len(str(c.value or "")) for c in col) + 2))
+    wb.save(path)
+    return path
