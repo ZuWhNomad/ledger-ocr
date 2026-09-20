@@ -475,8 +475,8 @@ def test_spreadsheet_image_to_xlsx():
 
 def test_receipt_photo_extracts_text():
     jpg_path = os.path.join(ROOT, "tests", "fixtures", "real", "receipt_pharmacy.jpg")
-    if not EX.ocr_available():
-        print("SKIP test_receipt_photo_extracts_text (Tesseract not installed)")
+    if not EX.ocr_available() or not os.path.exists(jpg_path):
+        print("SKIP test_receipt_photo_extracts_text (Tesseract or the private fixture is absent)")
         return
     import tempfile
     with tempfile.TemporaryDirectory() as td:
