@@ -1,20 +1,22 @@
+# state, secrets, local-only
+.state/
+.env*
+*.local.*
+*.log
+# real documents never enter the repo
+private-fixtures/
+test/fixtures/real/
+# python
 __pycache__/
 *.pyc
-
-# regression fixtures are regenerated deterministically by the test suite
-app/samples/fixture_*.pdf
 .venv/
 venv/
 *.egg-info/
 .pytest_cache/
-
-# PyInstaller / installer build artifacts (keep the SOURCE: *.spec, *.iss, *.bat, *.ps1)
-installer/build/
-installer/dist/
-installer/Output/
+# build + archives
 build/
 dist/
+out/
 *.exe
-# The built Setup.exe is a ~36 MB build artifact — never tracked. Build it with
-# installer/build_installer.ps1; distribute it out-of-band (release page), not in git.
-app/tests/fixtures/real/
+*.zip
+*.bundle
