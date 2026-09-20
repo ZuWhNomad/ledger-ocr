@@ -16,7 +16,7 @@ import tempfile
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from . import readers as R
 from .pipeline import MODES, process
@@ -75,7 +75,7 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path != "/api/process":
             return self._send(404, {"error": "not found"})
         q = parse_qs(parsed.query)
-        filename = os.path.basename(self.headers.get("X-Filename", "upload"))
+        filename = os.path.basename(unquote(self.headers.get("X-Filename", "upload")))  # percent-encoded by the page
         ext = os.path.splitext(filename)[1].lower()
         if ext not in R.IMAGE_EXTS | R.GRID_EXTS | {".pdf"}:
             return self._send(200, {"ok": False, "error": f"Unsupported file type '{ext}'. "

@@ -109,7 +109,8 @@ async function upload(file) {
   const qs = new URLSearchParams({ mode: $('#mode').value });
   let d;
   try {
-    d = await fetch('/api/process?' + qs, { method: 'POST', headers: { 'X-Filename': file.name }, body: file }).then(r => r.json());
+    // header values must be Latin-1, so the name travels percent-encoded (the server decodes it)
+    d = await fetch('/api/process?' + qs, { method: 'POST', headers: { 'X-Filename': encodeURIComponent(file.name) }, body: file }).then(r => r.json());
   } catch (err) { d = { ok: false, error: String(err) }; }
   render(job, file.name, d);
 }

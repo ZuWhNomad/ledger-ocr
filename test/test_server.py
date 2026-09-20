@@ -40,6 +40,14 @@ def test_process_returns_rows_and_downloads(url):
     assert not any(k.startswith("_") for k in d["rows"][0])
 
 
+def test_non_latin1_filename_round_trips(url):
+    """Header values are Latin-1 only; the page percent-encodes the name and the server decodes it."""
+    from urllib.parse import quote
+    with open(os.path.join(FIXTURES, "bank_statement.pdf"), "rb") as f:
+        _, d = _post(url, quote("mêskanâs – relevé.pdf"), f.read())
+    assert d["ok"] and d["filename"] == "mêskanâs – relevé.pdf"
+
+
 def test_text_mode_and_bad_input(url):
     with open(os.path.join(FIXTURES, "bank_statement.pdf"), "rb") as f:
         _, d = _post(url, "statement.pdf", f.read(), query="?mode=text")
