@@ -10,7 +10,9 @@ import os
 import sys
 from importlib import metadata, util
 
+from . import __version__
 from . import readers as R
+from . import update as U
 from .pipeline import MODES, process
 
 
@@ -21,6 +23,8 @@ def health() -> dict:
         except metadata.PackageNotFoundError:
             return None
     return {
+        "version": __version__,
+        "update": U.check(),
         "python": sys.version.split()[0],
         "ocr_engines": R.available_engines(),      # first one is what "auto" uses
         "tesseract": R._tesseract_cmd(),
@@ -37,7 +41,8 @@ def main(argv=None) -> int:
     ap.add_argument("--mode", choices=MODES, default="auto")
     ap.add_argument("--engine", choices=["auto", *R.ENGINES], default="auto")
     ap.add_argument("--json", action="store_true", help="machine-readable result on stdout")
-    ap.add_argument("--health", action="store_true", help="report versions and which OCR engines were found")
+    ap.add_argument("--health", action="store_true", help="report versions, OCR engines found, and whether a newer release exists")
+    ap.add_argument("--version", action="version", version=f"LedgerOCR {__version__}")
     ap.add_argument("--ui", action="store_true", help="open the drag-and-drop page in the browser (default with no files)")
     ap.add_argument("--port", type=int, default=8765, help="port for --ui (0 = any free port)")
     args = ap.parse_args(argv)

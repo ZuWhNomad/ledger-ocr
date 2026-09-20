@@ -6,6 +6,7 @@ import tempfile
 import pytest
 
 os.environ["LEDGEROCR_STATE"] = tempfile.mkdtemp(prefix="ledgerocr_test_state_")
+os.environ["LEDGEROCR_NO_UPDATE_CHECK"] = "1"   # no test ever phones home
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
 sys.path.insert(0, FIXTURES)   # make_sample: the synthetic-PDF builders

@@ -45,6 +45,9 @@
              overflow-wrap:anywhere; background:var(--bg); border:1px solid var(--line); border-radius:10px;
              padding:12px; margin:8px 0; font-size:13px; }
   .note { color:var(--mut); font-size:12px; }
+  #update { display:none; margin:0 0 14px; padding:10px 14px; border-radius:10px;
+            border:1px solid var(--accent); background:#0b3a4a; font-size:13px; }
+  #update a { color:var(--accent); }
 </style>
 </head>
 <body>
@@ -53,6 +56,7 @@
   <div class="sub">Runs entirely on this computer. Statements and ledgers become CSV / Excel with any bad balance flagged; everything else becomes text or Word.</div>
 </header>
 <main>
+  <div id="update"></div>
   <div id="drop">
     <h2>Drop PDFs, photos, scans, Excel or Word files here</h2>
     <p>or click to choose. Several files at once is fine.</p>
@@ -84,6 +88,12 @@ fetch('/api/env').then(r => r.json()).then(e => {
   b.textContent = ok ? 'OCR: ' + e.ocr_engines.join(' + ') : 'OCR: none found — scans and photos will not read';
   b.className = 'badge ' + (ok ? 'on' : 'off');
   $('#version').textContent = 'v' + e.version;
+  const u = e.update || {};
+  if (u.newer) {                                  // checked in the background at launch
+    $('#update').innerHTML = `A newer version is available: <b>${esc(u.latest)}</b> `
+      + `(you have ${esc(u.current)}). <a href="${esc(u.url)}" target="_blank" rel="noopener">Download it</a>.`;
+    $('#update').style.display = 'block';
+  }
 }).catch(() => {});
 
 drop.onclick = () => fileEl.click();

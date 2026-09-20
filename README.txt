@@ -53,6 +53,12 @@ tried and the result whose balances add up is kept.
 
 
 PRIVACY AND OFFLINE USE
-- Everything runs locally on your machine.
+- Your documents are read on this machine only. Nothing about them is ever sent
+  anywhere, and no cloud OCR or cloud AI is used.
 - Safe for confidential client files.
 - Works fully with no internet connection.
+- The one thing that touches the internet: at start-up the app asks GitHub
+  whether a newer version has been released, so it can show a "new version
+  available" link. It sends nothing at all - not your version, not your name,
+  not a word about your files - and it gives up quietly when offline. To switch
+  it off, set the environment variable LEDGEROCR_NO_UPDATE_CHECK=1.

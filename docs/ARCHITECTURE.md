@@ -1,7 +1,8 @@
 # Architecture (current state only)
 
 **Goal:** drop any document in, get a ledger table (CSV/XLSX/DOCX, suspect rows flagged) or, when there is no
-table, its plain text. Fully offline: no network call anywhere in `ledger_ocr/`.
+table, its plain text. Offline: no document data ever leaves the machine. The only network call in the
+package is `update.py` (below).
 
 ## How it works
 
@@ -33,7 +34,10 @@ file -> readers -> pages of word boxes -> tables -> rows -> reconcile -> export
 7. **server.py + static/index.html** - the drag-and-drop page. Loopback only, Host header checked, one
    `POST /api/process` per file (bytes in, `pipeline.process` result + base64 output files out), temp folder
    deleted per request. No state on the server.
-8. **installer/** - `LedgerOCR.exe` (PyInstaller; the exe *is* the CLI, no args = the page) and
+8. **update.py** - one anonymous GET to the GitHub releases API at launch, in a background thread, to ask
+   whether a newer version exists; the UI then shows a download link. Sends nothing, never raises, skipped by
+   `LEDGEROCR_NO_UPDATE_CHECK`. Version truth is `ledger_ocr.__version__`, which `pyproject.toml` reads.
+9. **installer/** - `LedgerOCR.exe` (PyInstaller; the exe *is* the CLI, no args = the page) and
    `LedgerOCR-Setup.exe` (Inno Setup, per user). See `installer/CONTEXT.md`.
 
 ## Directory map

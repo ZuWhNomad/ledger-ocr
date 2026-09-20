@@ -2,7 +2,7 @@
 
 Purpose: any file -> ledger rows (flagged) or text, offline. Entry: `cli.main`, `pipeline.process(path, outdir, mode, engine)`.
 
-Invariants: no network; numbers only from deterministic extraction, `Decimal` never float; `tables`/`reconcile`
+Invariants: no network except `update.py`'s anonymous version ping; numbers only from deterministic extraction, `Decimal` never float; `tables`/`reconcile`
 never know which engine produced the words; unreadable money cell -> `None`, never a guess; no rows -> text.
 
 Test: `pytest` (OCR tests run once per installed engine). Accuracy: `python bench/bench.py`.
@@ -14,5 +14,6 @@ Test: `pytest` (OCR tests run once per installed engine). Accuracy: `python benc
 | amount parsed wrong, false/missed balance flag, sign convention | `reconcile.py` |
 | wrong engine chosen in auto, text vs table decision, error messages | `pipeline.py` |
 | output file format, highlighting | `export.py` |
-| flags, exit codes, `--health`, `--ui` | `cli.py` |
+| flags, exit codes, `--health`, `--version`, `--ui` | `cli.py` |
+| "new version" banner wrong/absent, app phoning home | `update.py` |
 | page does not load, upload rejected, 403, download buttons | `server.py`, `static/index.html` |

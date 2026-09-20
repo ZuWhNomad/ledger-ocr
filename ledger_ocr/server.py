@@ -18,7 +18,9 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
+from . import __version__
 from . import readers as R
+from . import update as U
 from .pipeline import MODES, process
 
 INDEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "index.html")
@@ -28,16 +30,12 @@ MIME = {"csv": "text/csv", "text": "text/plain",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
 
 
+UPDATE: dict = {}      # filled in the background at launch; empty until the check comes back
+
+
 def env() -> dict:
-    return {"ocr_engines": R.available_engines(), "modes": list(MODES), "version": _version()}
-
-
-def _version() -> str:
-    from importlib import metadata
-    try:
-        return metadata.version("ledger-ocr")
-    except metadata.PackageNotFoundError:
-        return "dev"
+    return {"ocr_engines": R.available_engines(), "modes": list(MODES),
+            "version": __version__, "update": dict(UPDATE)}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -106,6 +104,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def serve(port: int = 8765, open_browser: bool = True, ready: threading.Event | None = None) -> None:
     """Serve on 127.0.0.1; port 0 = pick a free one. `ready` is set (with `serve.url`) once bound."""
+    # One version check per launch, off the startup path: a slow or absent network can never
+    # delay the page, and the result is simply missing from /api/env until it lands.
+    threading.Thread(target=lambda: UPDATE.update(U.check()), daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     port = srv.server_address[1]
     Handler.allowed_hosts = {f"{h}{p}" for h in ("127.0.0.1", "localhost") for p in ("", f":{port}")}
