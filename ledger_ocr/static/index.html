@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledger OCR</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --ink:#e2e8f0; --mut:#94a3b8;
+          --accent:#38bdf8; --warn:#f59e0b; --warnbg:#42260a; --ok:#22c55e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:20px 28px; border-bottom:1px solid var(--line); }
+  h1 { margin:0; font-size:18px; } h1 span{ color:var(--accent); }
+  .sub { color:var(--mut); font-size:12px; margin-top:4px; }
+  main { max-width:1100px; margin:0 auto; padding:24px 28px; }
+  #drop { border:2px dashed var(--line); border-radius:12px; padding:48px 24px; text-align:center;
+          background:var(--card); cursor:pointer; transition:.15s; }
+  #drop.hot { border-color:var(--accent); background:#0b3a4a; }
+  #drop h2 { margin:0 0 6px; font-size:16px; } #drop p{ color:var(--mut); margin:4px 0; }
+  .opts { display:flex; gap:20px; flex-wrap:wrap; align-items:center; margin:18px 0; color:var(--mut); }
+  select { background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:3px 6px; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
+  .on { color:var(--ok); border-color:var(--ok); } .off{ color:var(--warn); border-color:var(--warn); }
+  .job { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:14px 0; }
+  .job h3 { margin:0 0 8px; font-size:14px; }
+  .summary { display:flex; gap:10px; flex-wrap:wrap; margin:8px 0; }
+  .chip { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:13px; }
+  .chip b { color:var(--accent); } .chip.warn b { color:var(--warn); }
+  .dl { margin:10px 0; display:flex; gap:10px; flex-wrap:wrap; }
+  .btn { background:var(--accent); color:#04222e; border:0; padding:8px 14px; border-radius:8px;
+         font-weight:600; cursor:pointer; font-size:13px; text-decoration:none; display:inline-block; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+  th, td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--mut); font-weight:600; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  tr.flagged { background:var(--warnbg); }
+  .flagtext { color:var(--warn); font-size:12px; }
+  .tablewrap { overflow:auto; max-height:420px; border:1px solid var(--line); border-radius:10px; }
+  .err { color:var(--warn); }
+  .working { display:flex; align-items:center; gap:10px; }
+  .spinner { width:16px; height:16px; border:2px solid var(--line); border-top-color:var(--accent);
+             border-radius:50%; animation:spin .8s linear infinite; flex:0 0 auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  pre.text { max-height:360px; overflow:auto; font-family:ui-monospace,Consolas,monospace; white-space:pre-wrap;
+             overflow-wrap:anywhere; background:var(--bg); border:1px solid var(--line); border-radius:10px;
+             padding:12px; margin:8px 0; font-size:13px; }
+  .note { color:var(--mut); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Ledger</span> OCR</h1>
+  <div class="sub">Runs entirely on this computer. Statements and ledgers become CSV / Excel with any bad balance flagged; everything else becomes text or Word.</div>
+</header>
+<main>
+  <div id="drop">
+    <h2>Drop PDFs, photos, scans, Excel or Word files here</h2>
+    <p>or click to choose. Several files at once is fine.</p>
+    <input type="file" id="file" hidden multiple
+           accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.webp,.heic,.heif,.xlsx,.xlsm,.docx">
+  </div>
+  <div class="opts">
+    <span>output:
+      <select id="mode">
+        <option value="auto" selected>Auto (table if there is one, else text)</option>
+        <option value="table">Ledger table → CSV / Excel</option>
+        <option value="text">Plain text → TXT / Word</option>
+      </select>
+    </span>
+    <span id="engines" class="badge off">OCR: checking…</span>
+    <span class="note" id="version"></span>
+  </div>
+  <div id="jobs"></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const drop = $('#drop'), fileEl = $('#file'), jobs = $('#jobs');
+const MIME = { csv:'text/csv', text:'text/plain',
+  xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+
+fetch('/api/env').then(r => r.json()).then(e => {
+  const b = $('#engines'), ok = e.ocr_engines.length > 0;
+  b.textContent = ok ? 'OCR: ' + e.ocr_engines.join(' + ') : 'OCR: none found — scans and photos will not read';
+  b.className = 'badge ' + (ok ? 'on' : 'off');
+  $('#version').textContent = 'v' + e.version;
+}).catch(() => {});
+
+drop.onclick = () => fileEl.click();
+fileEl.onchange = () => { handle(fileEl.files); fileEl.value = ''; };
+['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hot'); }));
+drop.addEventListener('drop', e => handle(e.dataTransfer.files));
+
+async function handle(files) {
+  for (const f of Array.from(files || [])) await upload(f);   // one at a time: OCR is CPU-bound
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function blob(b64, mime) { const bin = atob(b64), a = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new Blob([a], { type: mime }); }
+function dl(label, b64, mime, name) { const a = document.createElement('a'); a.className = 'btn';
+  a.textContent = label; a.href = URL.createObjectURL(blob(b64, mime)); a.download = name; return a; }
+
+async function upload(file) {
+  const job = document.createElement('div'); job.className = 'job';
+  job.innerHTML = `<h3>${esc(file.name)}</h3><div class="working"><span class="spinner"></span>Reading… a photo or scan can take up to a minute</div>`;
+  jobs.prepend(job);
+  const qs = new URLSearchParams({ mode: $('#mode').value });
+  let d;
+  try {
+    d = await fetch('/api/process?' + qs, { method: 'POST', headers: { 'X-Filename': file.name }, body: file }).then(r => r.json());
+  } catch (err) { d = { ok: false, error: String(err) }; }
+  render(job, file.name, d);
+}
+
+function render(job, name, d) {
+  const base = name.replace(/\.[^.]+$/, '');
+  let h = `<h3>${esc(name)}</h3>`;
+  if (!d.ok) { job.innerHTML = h + `<div class="err">${esc(d.error)}</div>`; return; }
+  const s = d.summary, read = (s.sources || []).join(' + ');
+  const links = document.createElement('div'); links.className = 'dl';
+  for (const k of ['csv', 'xlsx', 'docx', 'text'])
+    if (d[k + '_b64']) links.appendChild(dl('Download ' + (k === 'text' ? 'TXT' : k.toUpperCase()), d[k + '_b64'], MIME[k], base + (k === 'text' ? '.txt' : '.' + k)));
+  if (d.document_shape === 'text') {
+    h += `<div class="summary"><div class="chip">${esc(d.message)}</div><div class="chip">read by <b>${esc(read)}</b></div></div>`;
+    job.innerHTML = h; job.appendChild(links);
+    job.insertAdjacentHTML('beforeend', `<pre class="text">${esc(d.text_preview)}</pre>`);
+    return;
+  }
+  h += `<div class="summary"><div class="chip">rows <b>${s.rows}</b></div>`
+     + `<div class="chip">read by <b>${esc(read)}</b></div>`
+     + `<div class="chip">sign convention <b>${esc(String(s.sign_convention).replace(/_/g, ' '))}</b></div>`
+     + (s.balance_checked ? `<div class="chip ${s.balance_mismatches ? 'warn' : ''}">balance mismatches <b>${s.balance_mismatches}</b></div>`
+                          : `<div class="chip">balance <b>not checked</b></div>`) + `</div>`;
+  job.innerHTML = h; job.appendChild(links);
+  const cols = ['date', 'description', 'debit', 'credit', 'amount', 'balance'];
+  let t = '<div class="tablewrap"><table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '<th>notes</th></tr></thead><tbody>';
+  for (const r of d.rows) {
+    t += `<tr class="${r.flag ? 'flagged' : ''}">` + cols.map(c => `<td class="${c === 'description' || c === 'date' ? '' : 'num'}">${esc(r[c])}</td>`).join('')
+       + `<td>${r.flag ? `<span class="flagtext">${esc(r.flag)}</span>` : ''}</td></tr>`;
+  }
+  job.insertAdjacentHTML('beforeend', t + '</tbody></table></div>');
+}
+</script>
+</body>
+</html>

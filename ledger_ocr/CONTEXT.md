@@ -14,4 +14,5 @@ Test: `pytest` (OCR tests run once per installed engine). Accuracy: `python benc
 | amount parsed wrong, false/missed balance flag, sign convention | `reconcile.py` |
 | wrong engine chosen in auto, text vs table decision, error messages | `pipeline.py` |
 | output file format, highlighting | `export.py` |
-| flags, exit codes, `--health` | `cli.py` |
+| flags, exit codes, `--health`, `--ui` | `cli.py` |
+| page does not load, upload rejected, 403, download buttons | `server.py`, `static/index.html` |

@@ -33,3 +33,6 @@ packages = ["ledger_ocr"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
+
+[tool.setuptools.package-data]
+ledger_ocr = ["static/*.html"]

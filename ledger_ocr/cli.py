@@ -38,13 +38,17 @@ def main(argv=None) -> int:
     ap.add_argument("--engine", choices=["auto", *R.ENGINES], default="auto")
     ap.add_argument("--json", action="store_true", help="machine-readable result on stdout")
     ap.add_argument("--health", action="store_true", help="report versions and which OCR engines were found")
+    ap.add_argument("--ui", action="store_true", help="open the drag-and-drop page in the browser (default with no files)")
+    ap.add_argument("--port", type=int, default=8765, help="port for --ui (0 = any free port)")
     args = ap.parse_args(argv)
 
     if args.health:
         print(json.dumps(health(), indent=2))
         return 0
-    if not args.files:
-        ap.error("no files given")
+    if args.ui or not args.files:
+        from .server import serve
+        serve(port=args.port)
+        return 0
     failed = 0
     for f in args.files:
         r = process(f, outdir=args.out, mode=args.mode, engine=args.engine)

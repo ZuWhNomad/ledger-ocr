@@ -26,8 +26,13 @@ file -> readers -> pages of word boxes -> tables -> rows -> reconcile -> export
    judge: engines are tried in turn until one yields rows that all reconcile; otherwise most verified rows wins
    (tie: fewest unparseable money cells). No rows -> text output, never an empty CSV.
 5. **export.py** - CSV (stdlib, BOM for Excel), XLSX (flagged rows highlighted), DOCX table / DOCX text.
-6. **cli.py** - the only entry point today: `run-ledger-ocr`, `python -m ledger_ocr`. `--json` for callers,
-   `--health` for diagnostics.
+6. **cli.py** - the entry point: `run-ledger-ocr FILE...` (`--json` for callers, `--health` for diagnostics);
+   with no files, or `--ui`, it starts **server.py** and opens the browser.
+7. **server.py + static/index.html** - the drag-and-drop page. Loopback only, Host header checked, one
+   `POST /api/process` per file (bytes in, `pipeline.process` result + base64 output files out), temp folder
+   deleted per request. No state on the server.
+8. **installer/** - `LedgerOCR.exe` (PyInstaller; the exe *is* the CLI, no args = the page) and
+   `LedgerOCR-Setup.exe` (Inno Setup, per user). See `installer/CONTEXT.md`.
 
 ## Directory map
 
@@ -37,6 +42,7 @@ file -> readers -> pages of word boxes -> tables -> rows -> reconcile -> export
 | `test/` | pytest; mirrors `ledger_ocr/`; `conftest.py` isolates state; `fixtures/` = synthetic PDFs + expected CSVs (`generate.py`, `make_sample.py` rebuild them) |
 | `bench/bench.py` | engines x fixtures micro-F1 table (clean scan, rough scan, real private documents). Prints; writes nothing |
 | `run-ledger-ocr.cmd` | launcher (uses `.venv` when present) |
+| `installer/` | freeze + Setup.exe build; outputs (`dist/`, `build/`, `Output/`) are git-ignored |
 
 ## External programs
 
@@ -53,5 +59,5 @@ No persistent state yet. When there is, it goes in `%LOCALAPPDATA%\LedgerOCR`, o
 
 ## Not built yet
 
-Local UI (thin layer over `pipeline.process`), installer, local-model row checker (part 2; may flag, never edit),
-handling of 90-degree-rotated images without EXIF, multi-table pages.
+Local-model row checker (part 2; may flag, never edit), handling of 90-degree-rotated images without EXIF,
+multi-table pages, code signing (SmartScreen warns on unsigned builds).

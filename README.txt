@@ -14,25 +14,35 @@ Everything runs 100% on your computer. No internet connection is needed, no
 cloud service is used, and nothing is uploaded.
 
 
-STATUS
-Version 0.2 is a rebuild. Today it is a command-line tool; the drag-and-drop
-window and the installer come back once it reads real documents reliably.
-
-
-SET UP (once; needs Python 3.10 or newer)
-    python -m venv .venv
-    .venv\Scripts\python -m pip install -e .[extras]
+INSTALL
+- Run LedgerOCR-Setup.exe and click through. No administrator rights needed.
+- Windows may show a blue "protected your PC" screen because the installer is
+  not yet signed: click "More info", then "Run anyway".
 
 
 HOW TO USE
-    run-ledger-ocr statement.pdf photo.jpg --out results
-    run-ledger-ocr --health          (what is installed, which OCR was found)
-    run-ledger-ocr --help
+1. Open "Ledger OCR" from the Desktop or Start menu. A small black window
+   appears (leave it open - closing it stops the app) and your browser opens
+   the Ledger OCR page.
+2. Drag one or more files onto the drop area, or click it to choose.
+3. Each file gets its own panel: a table with any suspect row highlighted, or
+   a text preview. Click Download CSV / XLSX / DOCX / TXT. Files save to your
+   Downloads folder.
+4. "output" lets you force a table or plain text instead of auto-detecting.
 
-  --mode auto    a table if the file has one, otherwise text (default)
-  --mode text    always plain text
-  --engine ...   auto (default), winocr, tesseract
-  --json         full result on screen, for other programs
+
+FROM THE COMMAND LINE (optional)
+    LedgerOCR.exe statement.pdf photo.jpg --out results
+    LedgerOCR.exe --health          (what is installed, which OCR was found)
+    LedgerOCR.exe --help
+  --mode auto|table|text   --engine auto|winocr|tesseract   --json
+
+
+FROM SOURCE (developers; Python 3.10+)
+    python -m venv .venv
+    .venv\Scripts\python -m pip install -e .[dev]
+    run-ledger-ocr.cmd                      (or: .venv\Scripts\python -m pytest)
+    powershell -ExecutionPolicy Bypass -File installer\build_installer.ps1
 
 
 SCANS AND PHOTOS
