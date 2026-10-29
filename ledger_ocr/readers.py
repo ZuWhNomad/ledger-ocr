@@ -207,6 +207,19 @@ def _ocr_page(img, engine: str, unit: float = 1.0) -> Dict:
     return {"words": words, "width": img.width / unit, "text": text, "source": name}
 
 
+def _join_touching(words: List[Dict]) -> List[Dict]:
+    """Some PDFs draw a stray space glyph on top of a digit, and pdfplumber splits there
+    ('233.10' -> '2' '33.10'). A real word space has width; words that touch are one word."""
+    out: List[Dict] = []
+    for w in words:
+        p = out[-1] if out else None
+        if p and abs(p["top"] - w["top"]) < 1 and abs(w["x0"] - p["x1"]) < 0.1:
+            out[-1] = dict(p, text=p["text"] + w["text"], x1=w["x1"], bottom=max(p["bottom"], w["bottom"]))
+        else:
+            out.append(w)
+    return out
+
+
 def read_pages(path: str, engine: str = "auto", force_ocr: bool = False) -> List[Dict]:
     if ext_of(path) in IMAGE_EXTS:
         img = _open_image(path)
@@ -222,7 +235,10 @@ def read_pages(path: str, engine: str = "auto", force_ocr: bool = False) -> List
         for page in pdf.pages:
             text = "" if force_ocr else (page.extract_text() or "")
             if len(text) >= TEXT_LAYER_MIN_CHARS:
-                words = page.extract_words(use_text_flow=False, keep_blank_chars=False)
+                # Gap tolerance relative to type size: spreadsheet exports leave cells ~0.35 em
+                # apart with no space glyph, which the fixed 3pt default glues together.
+                words = _join_touching(page.extract_words(use_text_flow=False, keep_blank_chars=False,
+                                                          x_tolerance_ratio=0.2))
                 pages.append({"words": words, "width": float(page.width), "text": text,
                               "source": "pdf-text"})
             else:

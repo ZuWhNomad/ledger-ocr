@@ -14,6 +14,12 @@ def _texts(page):
     return {w["text"].strip(".,:").lower() for w in page["words"]}
 
 
+def test_touching_words_are_one_word():
+    w = lambda t, x0, x1: {"text": t, "x0": x0, "x1": x1, "top": 10.0, "bottom": 19.0}
+    joined = R._join_touching([w("2", 367.92, 372.47), w("33.10", 372.47 - 1e-12, 392.96), w("Fuel", 400, 415)])
+    assert [x["text"] for x in joined] == ["233.10", "Fuel"]
+
+
 def test_pdf_text_layer_is_read_without_ocr():
     pages = R.read_pages(os.path.join(FIXTURES, "bank_statement.pdf"), engine="not-an-engine")  # never consulted
     assert [p["source"] for p in pages] == ["pdf-text"]

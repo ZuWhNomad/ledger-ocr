@@ -4,9 +4,15 @@ import csv
 from decimal import Decimal
 from typing import List, Dict
 
-COLUMNS = ["date", "description", "debit", "credit", "amount", "balance", "flag", "llm_classification"]
+COLUMNS = ["type", "date", "num", "description", "account", "debit", "credit", "amount", "balance", "flag",
+           "llm_classification"]
+_OPTIONAL = ("type", "num", "account")   # exported only when the document has them
 # Money columns and the parsed-Decimal field that backs each (see reconcile.normalize_rows).
 _MONEY_FIELD = {"debit": "_debit", "credit": "_credit", "amount": "_amount", "balance": "_balance"}
+
+
+def _columns(rows: List[Dict]) -> List[str]:
+    return [c for c in COLUMNS if c not in _OPTIONAL or any(r.get(c) for r in rows)]
 
 
 def _flat(rows: List[Dict]) -> List[Dict]:
@@ -14,8 +20,11 @@ def _flat(rows: List[Dict]) -> List[Dict]:
     for r in rows:
         llm = r.get("llm") or {}
         out.append({
+            "type": r.get("type", ""),
             "date": r.get("date", ""),
+            "num": r.get("num", ""),
             "description": r.get("description", ""),
+            "account": r.get("account", ""),
             "debit": r.get("debit", ""),
             "credit": r.get("credit", ""),
             "amount": r.get("amount", ""),
@@ -28,7 +37,7 @@ def _flat(rows: List[Dict]) -> List[Dict]:
 
 def to_csv(rows: List[Dict], path: str) -> str:
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=COLUMNS)
+        w = csv.DictWriter(f, fieldnames=_columns(rows), extrasaction="ignore")
         w.writeheader()
         w.writerows(_flat(rows))
     return path
@@ -69,21 +78,22 @@ def to_xlsx(rows: List[Dict], path: str) -> str:
     wb = Workbook()
     ws = wb.active
     ws.title = "Transactions"
-    ws.append(COLUMNS)
+    cols = _columns(rows)
+    ws.append(cols)
     for c in ws[1]:
         c.font = Font(bold=True)
     warn = PatternFill(start_color="FFF4CCCC", end_color="FFF4CCCC", fill_type="solid")
     flat = _flat(rows)
     for row, frec in zip(rows, flat):
         values = []
-        for col in COLUMNS:
+        for col in cols:
             num = _xlsx_cell(row, col)
             values.append(num if num is not None else frec[col])
         ws.append(values)
         if frec["flag"]:
             for c in ws[ws.max_row]:
                 c.fill = warn
-    for i, col in enumerate(COLUMNS, 1):
+    for i, col in enumerate(cols, 1):
         width = max(len(col), *(len(str(r[col])) for r in flat)) if flat else len(col)
         ws.column_dimensions[get_column_letter(i)].width = min(max(width + 2, 8), 60)
     wb.save(path)
@@ -108,11 +118,12 @@ def to_docx(rows: List[Dict], path: str) -> str:
     doc.add_heading("Transactions", level=1)
 
     flat = _flat(rows)
-    table = doc.add_table(rows=1 + len(flat), cols=len(COLUMNS))
+    cols = _columns(rows)
+    table = doc.add_table(rows=1 + len(flat), cols=len(cols))
     table.style = "Table Grid"
 
     hdr_cells = table.rows[0].cells
-    for i, col in enumerate(COLUMNS):
+    for i, col in enumerate(cols):
         hdr_cells[i].text = col
         for p in hdr_cells[i].paragraphs:
             for run in p.runs:
@@ -121,7 +132,7 @@ def to_docx(rows: List[Dict], path: str) -> str:
     for row_idx, frec in enumerate(flat, start=1):
         row_cells = table.rows[row_idx].cells
         is_flagged = bool(frec.get("flag"))
-        for col_idx, col in enumerate(COLUMNS):
+        for col_idx, col in enumerate(cols):
             cell = row_cells[col_idx]
             cell.text = str(frec.get(col, ""))
             if is_flagged:

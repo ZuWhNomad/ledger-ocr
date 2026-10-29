@@ -152,10 +152,12 @@ function render(job, name, d) {
      + (s.balance_checked ? `<div class="chip ${s.balance_mismatches ? 'warn' : ''}">balance mismatches <b>${s.balance_mismatches}</b></div>`
                           : `<div class="chip">balance <b>not checked</b></div>`) + `</div>`;
   job.innerHTML = h; job.appendChild(links);
-  const cols = ['date', 'description', 'debit', 'credit', 'amount', 'balance'];
+  const text = ['type', 'date', 'num', 'description', 'account'];
+  const cols = ['type', 'date', 'num', 'description', 'account', 'debit', 'credit', 'amount', 'balance']
+    .filter(c => !['type', 'num', 'account'].includes(c) || d.rows.some(r => r[c]));
   let t = '<div class="tablewrap"><table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '<th>notes</th></tr></thead><tbody>';
   for (const r of d.rows) {
-    t += `<tr class="${r.flag ? 'flagged' : ''}">` + cols.map(c => `<td class="${c === 'description' || c === 'date' ? '' : 'num'}">${esc(r[c])}</td>`).join('')
+    t += `<tr class="${r.flag ? 'flagged' : ''}">` + cols.map(c => `<td class="${text.includes(c) ? '' : 'num'}">${esc(r[c])}</td>`).join('')
        + `<td>${r.flag ? `<span class="flagtext">${esc(r.flag)}</span>` : ''}</td></tr>`;
   }
   job.insertAdjacentHTML('beforeend', t + '</tbody></table></div>');

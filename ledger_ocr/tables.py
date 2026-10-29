@@ -14,12 +14,26 @@ from typing import List, Dict, Optional
 HEADER_SYNONYMS: Dict[str, List[str]] = {
     "date": ["date", "posting", "trans date", "value date"],
     "description": ["description", "desc", "descr", "details", "memo", "particulars",
-                    "narrative", "transaction", "reference", "payee"],
-    "debit": ["debit", "withdrawal", "withdrawals", "payment", "payments", "money out", "dr", "charge"],
-    "credit": ["credit", "deposit", "deposits", "money in", "cr", "receipt"],
+                    "narrative", "transaction", "reference", "payee", "name"],
+    # General-ledger columns (QuickBooks: Type Date Num Name Debit Credit Balance)
+    "type": ["type"],
+    "num": ["num"],
+    "debit": ["debit", "withdrawal", "withdrawals", "payment", "payments", "money out", "funds out",
+              "dr", "charge"],
+    "credit": ["credit", "deposit", "deposits", "money in", "funds in", "cr", "receipt"],
     "balance": ["balance"],
     "amount": ["amount"],
+    "account": ["account"],     # an expense category column (T2125-style expense lists)
 }
+_TEXT_COLS = ("type", "date", "num", "description", "account")
+# Pieces of a printed date: '6/07/21', '2021', 'Dec', '16,'. A date cell's words after its
+# date pieces belong to the next column (a right-aligned date sits one space from the name).
+_WORDY = re.compile(r"[A-Za-z]{2,}")
+_MARKER = re.compile(r"\(?(CR|DR|DB|Cr|Dr)\)?\.?")   # sign markers stay with their number
+_MONTH = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?"
+_DATE_PIECE = re.compile(r"\d[\d/.\-]*,?|" + _MONTH, re.I)
+_FULL_DATE = re.compile(r"\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}")    # nothing more of the date follows
+_DATE_WORD = re.compile(r"\d{1,4}[/.\-]\d{1,2}([/.\-]\d{1,4})?|" + _MONTH, re.I)   # unmistakably a date
 
 
 def _canon(label: str) -> Optional[str]:
@@ -73,8 +87,17 @@ def _find_header(rows: List[List[dict]]):
     """Return (header_row_index, {canon: (x_center, x0, x1)}) for the best header row."""
     best_i, best_map, best_score = -1, {}, 0
     for i, row in enumerate(rows):
-        cmap: Dict[str, tuple] = {}
+        # A header one space from the previous word is one phrase: 'Funds Out', 'CR Amount'.
+        cw = sorted((w["x1"] - w["x0"]) / max(1, len(w["text"])) for w in row)[len(row) // 2]
+        phrases: List[dict] = []
         for w in row:
+            p = phrases[-1] if phrases else None
+            if p and w["x0"] - p["x1"] <= 1.5 * cw:
+                phrases[-1] = dict(p, text=p["text"] + " " + w["text"], x1=w["x1"])
+            else:
+                phrases.append(w)
+        cmap: Dict[str, tuple] = {}
+        for w in phrases:
             canon = _canon(w["text"])
             if canon and canon not in cmap:
                 cmap[canon] = ((w["x0"] + w["x1"]) / 2, w["x0"], w["x1"])
@@ -86,17 +109,43 @@ def _find_header(rows: List[List[dict]]):
 
 
 def _column_bounds(header_map: Dict[str, tuple], page_width: float):
-    """Turn header x-centers into [lo, hi) boundaries per column, left to right."""
+    """Turn header x-centers into (canon, lo, hi, header left edge) per column, left to right."""
     items = sorted(header_map.items(), key=lambda kv: kv[1][0])
     bounds = []
     for idx, (canon, (cx, x0, x1)) in enumerate(items):
         lo = 0 if idx == 0 else (items[idx - 1][1][0] + cx) / 2
         hi = page_width if idx == len(items) - 1 else (items[idx + 1][1][0] + cx) / 2
-        bounds.append((canon, lo, hi))
+        bounds.append((canon, lo, hi, x0))
     return bounds
 
 
 _MONEY_COLS = ("debit", "credit", "amount", "balance")
+
+
+def _text_starts(bounds, header_map, data_rows, cw):
+    """Text columns are left-aligned under a header that is often centred, so a midpoint
+    between header centres cuts through them (a GL's Name column starts left of 'Name').
+    Move each text column's left edge to where its data actually starts: the most common
+    word x0 between the previous header's centre and this header's left edge. A word votes
+    when it follows a real gap ('General' in 'Receiver General' does not start a column) or a
+    date (a right-aligned date sits one space from the name); a date itself never votes.
+    Money columns are right-aligned and keep their midpoint bounds (a text column right of
+    them still moves its own left edge). A column with no data keeps its bound."""
+    xs = [round(w["x0"]) for row in data_rows for i, w in enumerate(row)
+          if not _DATE_WORD.fullmatch(w["text"])
+          and (i == 0 or w["x0"] - row[i - 1]["x1"] > 2 * cw or _DATE_PIECE.fullmatch(row[i - 1]["text"]))]
+    out = list(bounds)
+    for i in range(1, len(out)):
+        canon, lo, hi, right = out[i]
+        prev = out[i - 1][0]
+        if canon in _MONEY_COLS:
+            continue
+        cands = [x for x in xs if header_map[prev][0] < x <= header_map[canon][1] + cw]
+        if cands:
+            start = max(set(cands), key=cands.count) - cw / 2
+            out[i - 1] = (prev, out[i - 1][1], start, out[i - 1][3])
+            out[i] = (canon, start, hi, right)
+    return out
 
 
 def _degroup_money_cell(cell_words: List[dict], gap_tol: float):
@@ -142,27 +191,56 @@ def build_rows_from_words(words, page_width, carry_bounds=None):
         bounds = carry_bounds        # continuation page: reuse the prior header's columns
         data_rows = rows             # no header row to skip
     else:
-        bounds = _column_bounds(hdr_map, page_width)
         data_rows = rows[hdr_i + 1:]
+        cws = sorted((w["x1"] - w["x0"]) / max(1, len(w["text"])) for w in words)
+        bounds = _text_starts(_column_bounds(hdr_map, page_width), hdr_map, data_rows, cws[len(cws) // 2])
+
+    # Left of the money columns, words are placed by their left edge (text is left-aligned).
+    # A money word goes to the rightmost money column whose header starts before the number
+    # ends: numbers are right-aligned, and a header may sit left-aligned over them.
+    money_lo = min((b[1] for b in bounds if b[0] in _MONEY_COLS), default=page_width)
+    names = [b[0] for b in bounds]
+    after_date = names[names.index("date") + 1] if "date" in names[:-1] else None
+    money_starts = [(b[3], b[0]) for b in bounds if b[0] in _MONEY_COLS]
 
     def assign(w) -> Optional[str]:
         mid = (w["x0"] + w["x1"]) / 2
-        for canon, lo, hi in bounds:
-            if lo <= mid < hi:
+        x = mid if mid >= money_lo else w["x0"]
+        for canon, lo, hi, _ in bounds:
+            if lo <= x < hi:
+                if canon in _MONEY_COLS:
+                    return ([c for start, c in money_starts if start <= w["x1"]] or [money_starts[0][1]])[-1]
                 return canon
         return None
 
     out: List[Dict[str, str]] = []
     for row in data_rows:
-        cells: Dict[str, List[dict]] = {}
-        for w in row:
-            canon = assign(w)
-            if canon:
-                cells.setdefault(canon, []).append(w)
         # gap tolerance from the row's own type size: a real inter-word space is ~1 char
         # wide; a column gap is many times that. 3x median char width sits safely between.
         cw = sorted((w["x1"] - w["x0"]) / max(1, len(w["text"])) for w in row)
-        gap_tol = 3.0 * (cw[len(cw) // 2] if cw else 3.0)
+        cw = cw[len(cw) // 2] if cw else 1.0
+        gap_tol = 3.0 * cw
+        cells: Dict[str, List[dict]] = {}
+        prev, prev_canon = None, None
+        for w in row:
+            canon = assign(w)
+            # A phrase runs on across a column edge (a long GL account name, a description
+            # into the money columns): a word only a space after the previous text word stays
+            # in that word's column. Numbers and CR/DR markers are never part of the phrase.
+            if (canon and prev_canon and canon != prev_canon and prev_canon not in _MONEY_COLS
+                    and w["x0"] - prev["x1"] <= cw
+                    and (canon not in _MONEY_COLS
+                         or (_WORDY.search(w["text"]) and not _MARKER.fullmatch(w["text"])))):
+                canon = prev_canon
+            if canon:
+                cells.setdefault(canon, []).append(w)
+            prev, prev_canon = w, canon
+        dw = cells.get("date", [])
+        k = next((i for i, w in enumerate(dw) if not _DATE_PIECE.fullmatch(w["text"])
+                  or (i and _FULL_DATE.fullmatch(dw[i - 1]["text"]))), len(dw))
+        if 0 < k < len(dw):
+            cells["date"], spill = dw[:k], dw[k:]
+            cells.setdefault(after_date if after_date in _TEXT_COLS else "description", []).extend(spill)
         # A wide description column can push text across the approximate boundary into a
         # right-aligned money column; pull those leaked tokens back into the description.
         for mc in _MONEY_COLS:

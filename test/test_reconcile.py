@@ -16,6 +16,21 @@ def test_parse_money_edge_cases():
     assert p("") is None
     assert p("N/A") is None
     assert p("OCR-Pipeline tool.") is None
+    assert p("Page 2") is None                      # a page footer, not a balance of 2
+
+
+def test_general_ledger_restarts_balance_per_account_and_skips_totals():
+    rows, s = RC.reconcile(RC.normalize_rows([
+        {"type": "Bank Chequing", "balance": "1,000.00"},
+        {"date": "10/01/2020", "debit": "100.00", "balance": "1,100.00"},
+        {"date": "10/02/2020", "credit": "50.00", "balance": "1,050.00"},
+        {"type": "Total Bank Chequing", "debit": "100.00", "credit": "50.00", "balance": "1,050.00"},
+        {"type": "Accounts Receivable", "balance": "5,000.00"},          # new account: balance starts over
+        {"date": "10/03/2020", "debit": "25.00", "balance": "5,025.00"},
+        {"type": "TOTAL", "debit": "125.00", "credit": "50.00", "balance": "0.00"},
+    ]))
+    assert s["sign_convention"] == "debit_raises_balance"
+    assert s["balance_mismatches"] == 0
 
 
 def test_parse_money_locale_thousands():

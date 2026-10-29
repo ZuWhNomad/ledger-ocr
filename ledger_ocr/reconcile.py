@@ -98,6 +98,8 @@ def parse_money(s: Optional[str]) -> Optional[Decimal]:
     if re.search(r"[\d.,][A-Za-z]+\d|^(?![A-Z]{3}\d)[A-Za-z]+\d", t):
         return None     # a letter inside/glued onto a number (not a currency code): dropping it
                         # would silently invent a value ("12.a5" -> 12.5, "S2.50" -> 2.50)
+    if re.search(r"[A-Za-z]{4,}", t):
+        return None     # a word, not a marker (CR/DR/USD): a footer "Page 2" is not a balance of 2
     up = t.upper()
     if re.search(r"\bDR\b|DR$|DB$", up):
         neg = True
@@ -155,6 +157,20 @@ def normalize_rows(raw: List[Dict[str, str]]) -> List[Dict]:
     return out
 
 
+def _is_total(rec: Dict) -> bool:
+    """A subtotal line ('Total Savings', 'TOTAL'): sums, not a movement."""
+    return not _date_like(rec.get("date")) and any(
+        str(rec.get(k) or "").lower().startswith("total") for k in ("type", "date", "description"))
+
+
+def _is_opening(rec: Dict) -> bool:
+    """A dateless line with a balance and no movement: an opening balance or a new account
+    section in a general ledger, where the running balance starts over. Movement cells must
+    be empty, not merely unparseable: a misread amount is still flagged."""
+    return (rec.get("_balance") is not None and not _date_like(rec.get("date"))
+            and not any(rec.get(k) for k in ("debit", "credit", "amount")))
+
+
 def _delta(rec: Dict, sign: int) -> Optional[Decimal]:
     """Balance change for a row. sign=+1: debit raises; sign=-1: debit lowers.
 
@@ -195,7 +211,7 @@ def reconcile(rows: List[Dict]) -> Tuple[List[Dict], Dict]:
     """
     for rec in rows:
         rec["flag"] = None
-    with_bal = [r for r in rows if r.get("_balance") is not None]
+    with_bal = [r for r in rows if r.get("_balance") is not None and not _is_total(r)]
 
     # Does the statement carry debit/credit columns, or a single (signed) amount column?
     uses_dc = any(r.get("_debit") is not None or r.get("_credit") is not None for r in rows)
@@ -225,6 +241,11 @@ def reconcile(rows: List[Dict]) -> Tuple[List[Dict], Dict]:
         expected: Optional[Decimal] = None
         for rec in rows:
             bal = rec.get("_balance")
+            if _is_total(rec):
+                continue
+            if _is_opening(rec):
+                expected, anchored = bal, True
+                continue
             if not anchored:
                 if bal is not None:
                     expected, anchored = bal, True  # anchor on first printed balance
