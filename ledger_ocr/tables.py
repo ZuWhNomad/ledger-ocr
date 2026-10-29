@@ -291,6 +291,29 @@ def records_from_grid(tbl: List[List[str]]) -> List[Dict[str, str]]:
 
 # ---- generic tables (no ledger header) -------------------------------------------------------
 
+def grid_from_ruled(words, vlines):
+    """A printed spreadsheet: the cells are drawn, so a word's column is the gap between the
+    vertical rulings (x, [(top, bottom)]) its centre falls in - exact even when cells sit one
+    space apart. Text overflowing into the next cell crosses a ruling that is not drawn on that
+    row, and stays in the cell it started in."""
+    import bisect
+    xs = [x for x, _ in vlines]
+    grid = []
+    for row in _cluster_rows(words) if words else []:
+        y = sum((w["top"] + w["bottom"]) / 2 for w in row) / len(row)
+        drawn = [any(t <= y <= b for t, b in spans) for _, spans in vlines]
+        cells = [[] for _ in range(len(xs) + 1)]
+        prev = None
+        for w in row:
+            col = bisect.bisect(xs, (w["x0"] + w["x1"]) / 2)
+            if prev is not None and col > prev and not any(drawn[prev:col]):
+                col = prev
+            cells[col].append(w["text"])
+            prev = col
+        grid.append([" ".join(c) for c in cells])
+    return grid
+
+
 def grid_from_words(words, page_width, min_rows: int = 3):
     """Any table, without knowing its headers: columns are the vertical white gaps that run
     through the rows. Returns a grid of cell strings, or [] when the page does not look tabular

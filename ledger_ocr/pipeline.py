@@ -81,6 +81,11 @@ def process(path: str, outdir: Optional[str] = None, mode: str = "auto",
     except (R.NoOcrEngine, ValueError) as e:
         return {"ok": False, "error": str(e)}
 
+    # A printed spreadsheet whose ledger cannot be verified (no balance column) is better kept
+    # whole, cut along its drawn cells, than squeezed into the ledger columns.
+    if rows and not summary["balance_checked"] and R.ext_of(path) not in R.GRID_EXTS \
+            and any(p.get("vlines") for p in pages):
+        rows, summary = RC.reconcile([])
     # No ledger? Any other table (a tax slip, an invoice, a price list) still becomes a spreadsheet.
     grid = [] if rows or mode == "text" else _grid(pages if R.ext_of(path) not in R.GRID_EXTS else [])
     if not rows and not grid and mode != "text":
@@ -118,7 +123,16 @@ def process(path: str, outdir: Optional[str] = None, mode: str = "auto",
 
 
 def _grid(pages: List[Dict]) -> List[List[str]]:
-    grid = []
+    grid, first = [], None
     for p in pages:
-        grid.extend(T.grid_from_words(p["words"], p["width"]))
-    return [[RC.fix_ocr_digits(c) for c in row] for row in grid]
+        g = (T.grid_from_ruled(p["words"], p["vlines"]) if p.get("vlines")
+             else T.grid_from_words(p["words"], p["width"]))
+        if first is None:
+            first = g
+        else:       # a printed sheet repeats its frozen top rows on every page: keep them once
+            g = g[next((i for i, (a, b) in enumerate(zip(g, first)) if a != b), min(len(g), len(first))):]
+        grid.extend(g)
+    width = max(map(len, grid), default=0)
+    grid = [row + [""] * (width - len(row)) for row in grid]
+    keep = [i for i in range(width) if any(row[i] for row in grid)]     # drop never-used columns
+    return [[RC.fix_ocr_digits(row[i]) for i in keep] for row in grid]

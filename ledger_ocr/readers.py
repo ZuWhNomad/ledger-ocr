@@ -220,6 +220,43 @@ def _join_touching(words: List[Dict]) -> List[Dict]:
     return out
 
 
+def _vlines(page) -> List[Tuple[float, List[Tuple[float, float]]]]:
+    """The page's vertical cell rulings (a printed spreadsheet's gridlines): [(x, [(top, bottom)])]
+    for positions where at least three segments line up (a border or one rule is not a grid).
+    Segments within 1pt are one ruling (a thin rect has two edges). The spans matter: a sheet
+    draws no gridline under text that overflows into the empty cell beside it."""
+    segs = sorted((e["x0"], e["top"], e["bottom"]) for e in page.edges if e["orientation"] == "v")
+    lines: List[Tuple[float, List[Tuple[float, float]]]] = []
+    for x, top, bottom in segs:
+        if lines and x - lines[-1][0] <= 1:
+            lines[-1][1].append((top, bottom))
+        else:
+            lines.append((x, [(top, bottom)]))
+    return [ln for ln in lines if len(ln[1]) >= 3]
+
+
+def _visible(page, pdfium_page):
+    """The page without its fully transparent characters. Spreadsheet exports pad accounting
+    cells with invisible brackets ('($ 2.74)' renders as '$ 2.74'); read as text they would make
+    every amount negative. pdfminer does not track opacity; PDFium (already shipped with
+    pdfplumber for rendering) does, so its alpha-0 glyph origins are matched to pdfplumber chars."""
+    import ctypes
+    import pypdfium2.raw as raw
+    tp = pdfium_page.get_textpage()
+    r, g, b, a = (ctypes.c_uint() for _ in range(4))
+    x, y = ctypes.c_double(), ctypes.c_double()
+    hidden = set()
+    for i in range(tp.count_chars()):
+        if raw.FPDFText_GetFillColor(tp.raw, i, r, g, b, a) and a.value == 0:
+            raw.FPDFText_GetCharOrigin(tp.raw, i, x, y)
+            hidden.add((chr(raw.FPDFText_GetUnicode(tp.raw, i)), round(x.value), round(y.value)))
+    tp.close()
+    if not hidden:
+        return page
+    return page.filter(lambda o: o.get("object_type") != "char" or
+                       (o["text"], round(o["matrix"][4]), round(o["matrix"][5])) not in hidden)
+
+
 def read_pages(path: str, engine: str = "auto", force_ocr: bool = False) -> List[Dict]:
     if ext_of(path) in IMAGE_EXTS:
         img = _open_image(path)
@@ -230,20 +267,32 @@ def read_pages(path: str, engine: str = "auto", force_ocr: bool = False) -> List
             pages.append(_ocr_page(img.copy(), engine))
         return pages
     import pdfplumber
+    import pypdfium2
     pages = []
-    with pdfplumber.open(path) as pdf:
-        for page in pdf.pages:
-            text = "" if force_ocr else (page.extract_text() or "")
-            if len(text) >= TEXT_LAYER_MIN_CHARS:
-                # Gap tolerance relative to type size: spreadsheet exports leave cells ~0.35 em
-                # apart with no space glyph, which the fixed 3pt default glues together.
-                words = _join_touching(page.extract_words(use_text_flow=False, keep_blank_chars=False,
-                                                          x_tolerance_ratio=0.2))
-                pages.append({"words": words, "width": float(page.width), "text": text,
-                              "source": "pdf-text"})
-            else:
-                pages.append(_ocr_page(page.to_image(resolution=OCR_DPI).original, engine,
-                                       unit=OCR_DPI / 72))
+    doc = pypdfium2.PdfDocument(path)
+    try:
+        with pdfplumber.open(path) as pdf:
+            for i, page in enumerate(pdf.pages):
+                if not force_ocr:
+                    pdfium_page = doc[i]
+                    page = _visible(page, pdfium_page)
+                    pdfium_page.close()     # an open handle would lock the file on Windows
+                text = "" if force_ocr else (page.extract_text() or "")
+                if len(text) >= TEXT_LAYER_MIN_CHARS:
+                    # Tolerances relative to type size: spreadsheet exports leave cells ~0.35 em
+                    # apart with no space glyph, and a sheet shrunk to fit a page (2pt type) has
+                    # rows closer than the fixed 3pt line tolerance, which then chains them.
+                    sizes = sorted(c["size"] for c in page.chars)
+                    words = _join_touching(page.extract_words(
+                        use_text_flow=False, keep_blank_chars=False, x_tolerance_ratio=0.2,
+                        y_tolerance=min(3, 0.4 * sizes[len(sizes) // 2])))
+                    pages.append({"words": words, "width": float(page.width), "text": text,
+                                  "source": "pdf-text", "vlines": _vlines(page)})
+                else:
+                    pages.append(_ocr_page(page.to_image(resolution=OCR_DPI).original, engine,
+                                           unit=OCR_DPI / 72))
+    finally:
+        doc.close()
     return pages
 
 

@@ -13,6 +13,48 @@ needs_engine = pytest.mark.parametrize(
     "engine", R.available_engines() or [pytest.param("none", marks=pytest.mark.skip("no OCR engine installed"))])
 
 
+def _printed_sheet(path, size):
+    """A spreadsheet printed to PDF, scaled to `size` pt type: gridlines drawn per cell, a note
+    that overflows into the empty cell beside it (no gridline under it), accounting padding
+    brackets drawn fully transparent, and the header row repeated on page 2."""
+    canvas = pytest.importorskip("reportlab.pdfgen.canvas")
+    k = size / 8
+    xs = [50 * k, 110 * k, 170 * k, 330 * k, 400 * k]
+    c = canvas.Canvas(str(path))
+    pages = [[("Date", "KM", "Notes"), ("Jan26", "24.00", "Quote"),
+              ("Feb 5th", "67.40", "supplies run and a long note that overflows"), ("Mar 3", "$ 2.74", "Paint")],
+             [("Date", "KM", "Notes"), ("Apr 1", "10.00", "Hardware store"), ("Apr 2", "11.50", "Client visit")]]
+    for rows in pages:
+        c.setFont("Helvetica", size)
+        for n, (date, km, note) in enumerate(rows):
+            top = 800 - 12 * k * n
+            for x in xs:
+                if not (x == xs[3] and "overflows" in note):
+                    c.line(x, top, x, top - 12 * k)
+            c.drawString(xs[0] + 2 * k, top - 9 * k, date)
+            c.drawRightString(xs[2] - 2 * k, top - 9 * k, km)
+            c.drawString(xs[2] + 2 * k, top - 9 * k, note)
+            if km.startswith("$"):
+                c.setFillAlpha(0)
+                c.drawString(xs[1] + 1 * k, top - 9 * k, "(")
+                c.drawString(xs[2] - 1.9 * k, top - 9 * k, ")")
+                c.setFillAlpha(1)
+        c.showPage()
+    c.save()
+
+
+@pytest.mark.parametrize("size", [8, 2])     # 2pt: a whole sheet shrunk onto one page
+def test_printed_spreadsheet_is_cut_along_its_gridlines(tmp_path, size):
+    _printed_sheet(tmp_path / "sheet.pdf", size)
+    r = process(str(tmp_path / "sheet.pdf"))
+    assert r["document_shape"] == "table"
+    assert r["grid"] == [["Date", "KM", "Notes"], ["Jan26", "24.00", "Quote"],
+                         ["Feb 5th", "67.40", "supplies run and a long note that overflows"],
+                         ["Mar 3", "$ 2.74", "Paint"],          # invisible '(' ')' never read
+                         ["Apr 1", "10.00", "Hardware store"],  # page 2's repeated header kept once
+                         ["Apr 2", "11.50", "Client visit"]]
+
+
 def test_statement_extracts_and_flags_the_one_bad_balance(tmp_path):
     r = process(SAMPLE, outdir=str(tmp_path))
     assert r["ok"] and r["document_shape"] == "ledger"
